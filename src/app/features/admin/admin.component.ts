@@ -110,13 +110,74 @@ import { AuthService } from '../../services/auth.service';
             </div>
           </section>
 
-          <!-- Simulator Speed -->
+          <!-- Custom Notification -->
           <section class="admin-card">
             <h2 class="card-title">
-              <span class="card-icon">⏱️</span> Simulator Speed
+              <span class="card-icon">✉️</span> Custom Notification
             </h2>
-            <p class="card-desc">Control how fast the crowd simulation ticks.</p>
-            <div class="speed-buttons">
+            <p class="card-desc">Broadcast a custom message to all connected users instantly.</p>
+            
+            <div class="notification-form">
+              <div class="input-group">
+                <input 
+                  type="text" 
+                  class="custom-input" 
+                  placeholder="Type your message here..." 
+                  [value]="customMessage()"
+                  (input)="customMessage.set($any($event.target).value)"
+                  (keyup.enter)="sendCustomNotification()"
+                />
+              </div>
+
+              <div class="notification-meta-grid">
+                <div class="meta-select-group">
+                  <span class="meta-label-sm">Severity</span>
+                  <div class="severity-tabs">
+                    @for (opt of severityOptions; track opt.value) {
+                      <button 
+                        class="sev-tab" 
+                        [class.active]="selectedSeverity() === opt.value"
+                        [class]="'sev-' + opt.value"
+                        (click)="selectedSeverity.set(opt.value)">
+                        {{ opt.label }}
+                      </button>
+                    }
+                  </div>
+                </div>
+
+                <div class="meta-select-group">
+                  <span class="meta-label-sm">Icon</span>
+                  <div class="icon-picker">
+                    @for (icon of icons; track icon) {
+                      <button 
+                        class="icon-opt" 
+                        [class.active]="selectedIcon() === icon"
+                        (click)="selectedIcon.set(icon)">
+                        {{ icon }}
+                      </button>
+                    }
+                  </div>
+                </div>
+              </div>
+
+              <button 
+                class="send-btn" 
+                [disabled]="!customMessage().trim()"
+                (click)="sendCustomNotification()">
+                <span class="send-icon">🚀</span>
+                Broadcast to All Clients
+              </button>
+            </div>
+          </section>
+        </div>
+
+        <!-- Row 3: Simulator Speed -->
+        <section class="admin-card full-width" style="margin-bottom: 16px;">
+          <h2 class="card-title">
+            <span class="card-icon">⏱️</span> Simulator Speed & Control
+          </h2>
+          <div class="speed-row">
+            <div class="speed-buttons" style="margin-bottom: 0; flex: 1;">
               @for (speed of speedOptions; track speed.value) {
                 <button class="speed-btn"
                         [class.active]="currentSpeed() === speed.value"
@@ -125,12 +186,12 @@ import { AuthService } from '../../services/auth.service';
                 </button>
               }
             </div>
-            <div class="speed-info">
+            <div class="speed-info-bubble">
               <span class="speed-label">Tick interval:</span>
               <span class="speed-value">{{ (3000 / currentSpeed()) }}ms</span>
             </div>
-          </section>
-        </div>
+          </div>
+        </section>
 
         <!-- Row 3: Per-Zone Density Control -->
         <section class="admin-card full-width">
@@ -511,6 +572,154 @@ import { AuthService } from '../../services/auth.service';
       font-size: 0.8rem;
     }
 
+    .speed-row {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+
+    .speed-info-bubble {
+      background: rgba(255, 255, 255, 0.05);
+      padding: 8px 16px;
+      border-radius: 99px;
+      border: 1px solid var(--color-border);
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    /* ─── Notification Form ─── */
+    .notification-form {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .custom-input {
+      width: 100%;
+      background: rgba(0, 0, 0, 0.2);
+      border: 1px solid var(--color-border);
+      color: var(--color-text-primary);
+      padding: 12px 16px;
+      border-radius: 12px;
+      font-family: var(--font-sans);
+      font-size: 0.9rem;
+      transition: all 0.2s;
+    }
+
+    .custom-input:focus {
+      outline: none;
+      border-color: #6366f1;
+      background: rgba(0, 0, 0, 0.3);
+      box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);
+    }
+
+    .notification-meta-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .meta-select-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .meta-label-sm {
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: var(--color-text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .severity-tabs {
+      display: flex;
+      gap: 6px;
+    }
+
+    .sev-tab {
+      flex: 1;
+      padding: 8px 4px;
+      border-radius: 8px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--color-border);
+      color: var(--color-text-secondary);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .sev-tab.active.sev-info { background: rgba(59, 130, 246, 0.15); border-color: #3b82f6; color: #60a5fa; }
+    .sev-tab.active.sev-success { background: rgba(34, 197, 94, 0.15); border-color: #22c55e; color: #4ade80; }
+    .sev-tab.active.sev-warning { background: rgba(245, 158, 11, 0.15); border-color: #f59e0b; color: #fbbf24; }
+
+    .icon-picker {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .icon-opt {
+      width: 36px;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--color-border);
+      cursor: pointer;
+      font-size: 1.1rem;
+      transition: all 0.2s;
+    }
+
+    .icon-opt:hover { background: rgba(255, 255, 255, 0.08); }
+    .icon-opt.active {
+      background: rgba(99, 102, 241, 0.15);
+      border-color: #6366f1;
+      transform: scale(1.1);
+    }
+
+    .send-btn {
+      margin-top: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      padding: 14px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #6366f1, #4f46e5);
+      color: white;
+      font-weight: 700;
+      font-size: 0.9rem;
+      border: none;
+      cursor: pointer;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+    }
+
+    .send-btn:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4);
+      background: linear-gradient(135deg, #7477f3, #5a52ef);
+    }
+
+    .send-btn:active:not(:disabled) {
+      transform: translateY(0);
+    }
+
+    .send-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      filter: grayscale(1);
+    }
+
+    .send-icon { font-size: 1.1rem; }
+
     .speed-label { color: var(--color-text-muted); }
     .speed-value {
       color: var(--color-text-primary);
@@ -673,6 +882,19 @@ export class AdminComponent implements OnInit, OnDestroy {
     { value: 10, label: '10×' },
   ];
 
+  // ─── Custom Notification ───────────────────────────────────
+  customMessage = signal('');
+  selectedSeverity = signal<'info' | 'warning' | 'success'>('info');
+  selectedIcon = signal('📢');
+  
+  severityOptions = [
+    { value: 'info' as const, label: 'Info', icon: 'ℹ️' },
+    { value: 'success' as const, label: 'Success', icon: '✅' },
+    { value: 'warning' as const, label: 'Warning', icon: '⚠️' },
+  ];
+
+  icons = ['📢', '🚨', '🎫', '🌭', '🚻', '🌧️', '⚽', '🏆'];
+
   currentSpeed = signal(1);
   connectedClients = signal(0);
   private clientInterval: ReturnType<typeof setInterval> | null = null;
@@ -768,5 +990,20 @@ export class AdminComponent implements OnInit, OnDestroy {
       'exit': '🚪', 'medical': '🏥', 'corridor': '🚶'
     };
     return icons[type] ?? '📍';
+  }
+
+  sendCustomNotification(): void {
+    const message = this.customMessage().trim();
+    if (!message) return;
+
+    this.alertService.push({
+      message,
+      severity: this.selectedSeverity(),
+      icon: this.selectedIcon(),
+      duration: 6000
+    });
+
+    // Reset message
+    this.customMessage.set('');
   }
 }
