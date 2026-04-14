@@ -6,10 +6,12 @@ import { SimulatorService } from './services/simulator.service';
 import { VenueService } from './services/venue.service';
 import { AlertService } from './services/alert.service';
 import { StatsService } from './services/stats.service';
+import { LocationService } from './services/location.service';
 import { Zone, NavigationRoute } from './models/venue.model';
 
 import { SplashComponent } from './features/splash/splash.component';
 import { StadiumMapComponent } from './features/map/stadium-map.component';
+import { EarthMapComponent } from './features/google-map/earth-map.component';
 import { ZoneDetailComponent } from './features/zone-detail/zone-detail.component';
 import { AlertBannerComponent } from './features/alerts/alert-banner.component';
 import { QuickActionsComponent, QuickActionType } from './features/quick-actions/quick-actions.component';
@@ -25,6 +27,7 @@ import { StatsComponent } from './features/stats/stats.component';
     RouterOutlet,
     SplashComponent,
     StadiumMapComponent,
+    EarthMapComponent,
     ZoneDetailComponent,
     AlertBannerComponent,
     QuickActionsComponent,
@@ -53,6 +56,27 @@ import { StatsComponent } from './features/stats/stats.component';
               </div>
             </div>
             <div class="top-bar-right">
+              <!-- Map View Toggle -->
+              <div class="map-toggle">
+                <button class="toggle-btn"
+                        [class.active]="mapView() === 'stadium'"
+                        (click)="setMapView('stadium')"
+                        title="Stadium Map">
+                  🗺️
+                </button>
+                <button class="toggle-btn"
+                        [class.active]="mapView() === 'earth'"
+                        (click)="setMapView('earth')"
+                        title="Earth View">
+                  🛰️
+                </button>
+              </div>
+              <!-- Distance indicator -->
+              @if (locationService.distanceLabel()) {
+                <span class="distance-badge animate-fade-in">
+                  📍 {{ locationService.distanceLabel() }}
+                </span>
+              }
               <button class="stats-btn" (click)="toggleStats()" title="My Stats">
                 📊
               </button>
@@ -66,13 +90,20 @@ import { StatsComponent } from './features/stats/stats.component';
           <!-- Alert Banner -->
           <app-alert-banner />
 
-          <!-- Stadium Map (takes full height) -->
+          <!-- Map Area (takes full height) -->
           <main class="map-area">
-            <app-stadium-map
-              [activeRoute]="activeRoutePath()"
-              [selectedZoneId]="selectedZone()?.id ?? ''"
-              [highlightZoneType]="highlightZoneType()"
-              (zoneClicked)="onZoneClicked($event)" />
+            @if (mapView() === 'stadium') {
+              <app-stadium-map
+                [activeRoute]="activeRoutePath()"
+                [selectedZoneId]="selectedZone()?.id ?? ''"
+                [highlightZoneType]="highlightZoneType()"
+                (zoneClicked)="onZoneClicked($event)" />
+            } @else {
+              <app-earth-map
+                [activeRoute]="activeRoutePath()"
+                [highlightZoneType]="highlightZoneType()"
+                (gateClicked)="onEarthZoneClicked($event)" />
+            }
           </main>
 
           <!-- Quick Actions Bar -->
@@ -228,11 +259,91 @@ import { StatsComponent } from './features/stats/stats.component';
       border-radius: 50%;
     }
 
+    /* Mobile Responsive Top Bar */
+    @media (max-width: 480px) {
+      .top-bar {
+        padding: 8px;
+      }
+      .top-bar-left {
+        gap: 6px;
+      }
+      .top-bar-right {
+        gap: 6px;
+      }
+      .app-logo-sm {
+        font-size: 1.1rem;
+      }
+      .app-title-sm {
+        font-size: 0.95rem;
+      }
+      .event-badge {
+        font-size: 0.55rem;
+        letter-spacing: 0;
+      }
+      .distance-badge {
+        font-size: 0.55rem;
+        padding: 3px 5px;
+      }
+      .stats-btn {
+        width: 32px;
+        height: 32px;
+        font-size: 0.85rem;
+      }
+      .live-indicator {
+        display: none; /* Hide LIVE indicator on very small screens to save space */
+      }
+    }
+
+    /* ─── Map Toggle ─── */
+    .map-toggle {
+      display: flex;
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid var(--color-border);
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .toggle-btn {
+      width: 34px;
+      height: 30px;
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      font-size: 0.85rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.25s ease;
+      padding: 0;
+    }
+
+    .toggle-btn.active {
+      background: linear-gradient(135deg, rgba(99, 102, 241, 0.35), rgba(139, 92, 246, 0.35));
+      box-shadow: inset 0 0 12px rgba(99, 102, 241, 0.2);
+    }
+
+    .toggle-btn:not(.active):hover {
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    /* ─── Distance Badge ─── */
+    .distance-badge {
+      font-size: 0.6rem;
+      font-weight: 600;
+      color: var(--color-text-secondary);
+      padding: 3px 8px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      white-space: nowrap;
+    }
+
     /* ─── Map Area ─── */
     .map-area {
       flex: 1;
       overflow: hidden;
       position: relative;
+      z-index: 10;
     }
 
     /* ─── Bottom Bar ─── */
@@ -299,6 +410,7 @@ export class App implements OnInit, OnDestroy {
   private venueService = inject(VenueService);
   private alertService = inject(AlertService);
   private statsService = inject(StatsService);
+  locationService = inject(LocationService);
   private router = inject(Router);
 
   // ─── State ─────────────────────────────────────────────
@@ -312,6 +424,7 @@ export class App implements OnInit, OnDestroy {
   showRerouteAlert = signal(false);
   showMainUI = signal(true);
   highlightZoneType = signal('');
+  mapView = signal<'stadium' | 'earth'>('stadium');
 
   private rerouteCheckInterval: ReturnType<typeof setInterval> | null = null;
 
@@ -352,22 +465,26 @@ export class App implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.simulator.stop();
+    this.locationService.stopTracking();
     if (this.rerouteCheckInterval) clearInterval(this.rerouteCheckInterval);
   }
 
   // ─── Actions ───────────────────────────────────────────
 
   enterApp(): void {
-    this.showSplash.set(false);
-    this.simulator.start();
+    this.showSplash.set(false);    // We no longer start local simulation on clients. Admin drives it.
+    // this.simulator.start();
+
+    // Start GPS location tracking
+    this.locationService.startTracking();
 
     // Welcome alert after a brief delay
     setTimeout(() => {
       this.alertService.push({
-        message: 'Welcome! Tap zones on the map to see details',
+        message: 'Welcome! Tap zones on the map or switch to 🛰️ Earth View',
         severity: 'info',
         icon: '👋',
-        duration: 4000
+        duration: 5000
       });
     }, 500);
 
@@ -445,6 +562,19 @@ export class App implements OnInit, OnDestroy {
 
   toggleStats(): void {
     this.showStats.update(v => !v);
+  }
+
+  setMapView(view: 'stadium' | 'earth'): void {
+    this.mapView.set(view);
+  }
+
+  onEarthZoneClicked(zoneId: string): void {
+    const zone = this.venueService.getZone(zoneId);
+    if (zone) {
+      this.onZoneClicked(zone);
+      // Switch back to stadium view to show zone detail
+      // this.mapView.set('stadium');
+    }
   }
 
   dismissReroute(): void {

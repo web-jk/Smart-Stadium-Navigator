@@ -4,6 +4,7 @@ import { Router } from '@angular/router';
 import { SimulatorService } from '../../services/simulator.service';
 import { AlertService } from '../../services/alert.service';
 import { EventPhase, getDensityLevel, getDensityColor, getDensityLabel } from '../../models/venue.model';
+import { AuthService } from '../../services/auth.service';
 
 @Component({
   selector: 'app-admin',
@@ -22,6 +23,9 @@ import { EventPhase, getDensityLevel, getDensityColor, getDensityLabel } from '.
             <span class="connected-dot"></span>
             {{ connectedClients() }} clients
           </div>
+          <button class="back-btn" style="color: #ef4444; border-color: rgba(239, 68, 68, 0.3);" (click)="logout()">
+            Sign Out
+          </button>
           <button class="back-btn" (click)="goBack()">
             ← Back to App
           </button>
@@ -642,6 +646,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   private simulator = inject(SimulatorService);
   private alertService = inject(AlertService);
   private router = inject(Router);
+  private authService = inject(AuthService);
 
   // ─── Phase Control ─────────────────────────────────────────
   phases = [
@@ -693,8 +698,8 @@ export class AdminComponent implements OnInit, OnDestroy {
   getDensityLabel = getDensityLabel;
 
   ngOnInit(): void {
-    // Start simulator if not already running
-    this.simulator.start();
+    // We completely stop the automatic simulator tick. Admin ONLY manipulates manually.
+    // this.simulator.start();
 
     // Simulate connected clients fluctuation
     this.connectedClients.set(Math.floor(Math.random() * 200) + 800);
@@ -709,6 +714,10 @@ export class AdminComponent implements OnInit, OnDestroy {
 
   goBack(): void {
     this.router.navigate(['/']);
+  }
+
+  logout(): void {
+    this.authService.logout();
   }
 
   setPhase(phase: EventPhase): void {
@@ -744,7 +753,7 @@ export class AdminComponent implements OnInit, OnDestroy {
     // Stop and restart with new tick rate
     this.simulator.stop();
     (this.simulator as any).tickRate = 3000 / multiplier;
-    this.simulator.start();
+    // this.simulator.start(); // Disabled to allow purely manual control
   }
 
   onDensityChange(zoneId: string, event: Event): void {

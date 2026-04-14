@@ -1,13 +1,52 @@
-import { Injectable, signal } from '@angular/core';
+import { Injectable, signal, inject, NgZone } from '@angular/core';
+import { Firestore, collection, addDoc, onSnapshot, query, orderBy, limit, Timestamp } from '@angular/fire/firestore';
 import { AlertData } from '../models/venue.model';
 
 @Injectable({ providedIn: 'root' })
 export class AlertService {
+  private firestore = inject(Firestore, { optional: true });
+  private ngZone = inject(NgZone);
+  private initialized = false;
+
   /** Currently visible alerts */
   readonly alerts = signal<AlertData[]>([]);
 
-  /** Push a new alert */
-  push(alert: Omit<AlertData, 'id'>): void {
+  constructor() {
+    if (this.firestore) {
+      const q = query(
+        collection(this.firestore, 'stadiums/default/notifications'),
+        orderBy('createdAt', 'desc'),
+        limit(1)
+      );
+      
+      onSnapshot(q, (snapshot) => {
+        this.ngZone.run(() => {
+          snapshot.docChanges().forEach((change) => {
+            if (change.type === 'added' && this.initialized) {
+              const data = change.doc.data();
+              this.pushLocal(data as Omit<AlertData, 'id'>);
+            }
+          });
+          this.initialized = true;
+        });
+      });
+    }
+  }
+
+  /** Push a new alert to all clients via Firestore (used by Admin) */
+  async push(alert: Omit<AlertData, 'id'>): Promise<void> {
+    if (this.firestore) {
+      await addDoc(collection(this.firestore, 'stadiums/default/notifications'), {
+        ...alert,
+        createdAt: Timestamp.now()
+      });
+    } else {
+      this.pushLocal(alert);
+    }
+  }
+
+  /** Display the alert locally */
+  private pushLocal(alert: Omit<AlertData, 'id'>): void {
     const id = `alert-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
     const fullAlert: AlertData = { ...alert, id };
 

@@ -2,11 +2,11 @@ import { Venue } from '../models/venue.model';
 
 export const STADIUM_DATA: Venue = {
   id: 'stadium-a',
-  name: 'MetLife Arena',
+  name: 'MCA Stadium, Pune',
   type: 'stadium',
-  capacity: 82500,
-  currentAttendance: 71200,
-  eventName: 'Championship Finals 2026',
+  capacity: 37000,
+  currentAttendance: 32500,
+  eventName: 'IPL Finals 2026',
   eventPhase: 'active',
   zones: [
     // === ENTRANCES (Gates) ===

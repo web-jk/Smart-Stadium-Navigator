@@ -47,11 +47,11 @@ import { Component, output } from '@angular/core';
         <!-- Venue Name -->
         <div class="venue-name animate-fade-in">
           <span class="venue-icon">🏟️</span>
-          MetLife Arena
+          MCA Stadium, Pune
         </div>
 
         <!-- Event Name -->
-        <p class="event-name">Championship Finals 2026</p>
+        <p class="event-name">IPL Finals 2026</p>
 
         <!-- CTA Button -->
         <button class="cta-button" (click)="enter.emit()">

@@ -1,9 +1,13 @@
-import { Injectable, signal, computed } from '@angular/core';
+import { Injectable, signal, computed, inject, NgZone } from '@angular/core';
+import { Firestore, doc, onSnapshot, setDoc } from '@angular/fire/firestore';
 import { Venue, Zone, EventPhase, getDensityLevel, DensityLevel } from '../models/venue.model';
 import { STADIUM_DATA } from '../data/stadium.data';
 
 @Injectable({ providedIn: 'root' })
 export class SimulatorService {
+  private firestore = inject(Firestore, { optional: true });
+  private ngZone = inject(NgZone);
+  private documentPath = 'stadiums/default';
   private intervalId: ReturnType<typeof setInterval> | null = null;
   tickRate = 3000; // ms — public so admin can adjust
 
@@ -20,6 +24,39 @@ export class SimulatorService {
       .sort((a, b) => b.crowdDensity - a.crowdDensity)
       .slice(0, 5)
   );
+
+  constructor() {
+    if (this.firestore) {
+      const docRef = doc(this.firestore, this.documentPath);
+      onSnapshot(docRef, (snapshot) => {
+        console.log('[FIREBASE] onSnapshot triggered! Exists:', snapshot.exists());
+        if (snapshot.exists()) {
+          const data = snapshot.data();
+          console.log('[FIREBASE] Fresh data received:', data);
+          this.ngZone.run(() => {
+            this.venue.set(data as Venue);
+          });
+        }
+      }, (error) => {
+        console.error('[FIREBASE ERROR] Real-time sync disabled or disconnected:', error);
+      });
+    }
+  }
+
+  private async syncToFirestore(): Promise<void> {
+    if (this.firestore) {
+      try {
+        console.log('[FIREBASE] Attempting to push venue data to Firestore...');
+        const docRef = doc(this.firestore, this.documentPath);
+        await setDoc(docRef, this.venue());
+        console.log('[FIREBASE] Successfully pushed data to Firestore!');
+      } catch (err) {
+        console.error('[FIREBASE ERROR] Failed to sync to Firestore: ', err);
+      }
+    } else {
+      console.warn('[FIREBASE WARNING] this.firestore is missing! Cannot sync.');
+    }
+  }
 
   /** Start the simulation loop */
   start(): void {
@@ -63,11 +100,13 @@ export class SimulatorService {
 
       return updated;
     });
+    this.syncToFirestore();
   }
 
   /** Set event phase directly */
   setPhase(phase: EventPhase): void {
     this.venue.update(v => ({ ...structuredClone(v), eventPhase: phase }));
+    this.syncToFirestore();
   }
 
   /** Set a specific zone's density (for admin panel) */
@@ -84,6 +123,7 @@ export class SimulatorService {
       }
       return updated;
     });
+    this.syncToFirestore();
   }
 
   // ─── SIMULATION TICK ───────────────────────────────────────────
@@ -109,6 +149,7 @@ export class SimulatorService {
 
       return updated;
     });
+    this.syncToFirestore();
   }
 
   private getBaseLoad(type: string, phase: EventPhase): number {
