@@ -51,11 +51,49 @@ export class AlertService {
     const fullAlert: AlertData = { ...alert, id };
 
     this.alerts.update(list => [...list, fullAlert]);
+    
+    this.playNotificationSound();
 
     // Auto-dismiss after duration
     setTimeout(() => {
       this.dismiss(id);
     }, alert.duration || 5000);
+  }
+
+  /** Play a short, pleasant notification chime */
+  private playNotificationSound(): void {
+    try {
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioContextClass) return;
+
+      const audioContext = new AudioContextClass();
+      const now = audioContext.currentTime;
+
+      const playTone = (freq: number, volume: number, duration: number) => {
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(freq, now);
+
+        gainNode.gain.setValueAtTime(0, now);
+        gainNode.gain.linearRampToValueAtTime(volume, now + 0.02);
+        gainNode.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+
+        oscillator.start(now);
+        oscillator.stop(now + duration);
+      };
+
+      // Play a soft, pleasant dual-tone chime (E5 and B5)
+      playTone(659.25, 0.15, 0.8); 
+      setTimeout(() => playTone(987.77, 0.1, 0.6), 50);
+
+    } catch (e) {
+      console.warn('Could not play notification sound', e);
+    }
   }
 
   /** Dismiss an alert by ID */
@@ -72,34 +110,34 @@ export class AlertService {
 
   goalScored(): void {
     this.push({
-      message: '⚽ GOAL! Expect a rush at concession stands!',
+      message: 'WICKET! Expect a sudden rush at food stands!',
       severity: 'warning',
-      icon: '⚽',
+      icon: '☝️',
       duration: 6000
     });
   }
 
   halftimeStarted(): void {
     this.push({
-      message: '⏸️ Halftime! Restrooms and food zones getting busy',
+      message: 'Innings Break! Restrooms and food zones getting busy',
       severity: 'warning',
-      icon: '⏸️',
+      icon: '🥪',
       duration: 8000
     });
   }
 
   halftimeEnding(): void {
     this.push({
-      message: '▶️ Match resuming — crowds clearing from concessions',
+      message: 'Play Resuming — crowds clearing from concessions',
       severity: 'success',
-      icon: '▶️',
+      icon: '🏏',
       duration: 6000
     });
   }
 
   crowdClearing(zoneName: string): void {
     this.push({
-      message: `✅ ${zoneName} is clearing up — good time to visit!`,
+      message: `${zoneName} is clearing up — good time to visit!`,
       severity: 'success',
       icon: '✅',
       duration: 5000
@@ -108,7 +146,7 @@ export class AlertService {
 
   rainAlert(): void {
     this.push({
-      message: '🌧️ Rain detected! Covered areas getting crowded',
+      message: 'Rain detected! Covered areas getting crowded',
       severity: 'warning',
       icon: '🌧️',
       duration: 7000

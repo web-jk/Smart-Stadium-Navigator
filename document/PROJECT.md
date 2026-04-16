@@ -12,6 +12,18 @@ A **zero-install mobile-first web app** for real-time crowd navigation at large 
 
 ---
 
+## 📂 Feature Documentation
+Detailed technical documentation for specific features can be found in the [`document/`](./) folder:
+
+- [**Notification System**](./NOTIFICATION_SYSTEM.md) - Real-time alerts and audio triggers.
+- [**Real-time Sync Engine**](./REALTIME_SYNC.md) - Firebase Firestore synchronization logic.
+- [**Stadium Layouts**](./STADIUM_LAYOUTS.md) - Schematic SVG and Satellite Earth View details.
+- [**Smart Navigation**](./SMART_NAVIGATION.md) - Dijkstra-based routing with congestion awareness.
+- [**Admin Control Panel**](./ADMIN_PANEL.md) - Stadium management and "Draft & Publish" workflow.
+- [**System Architecture**](./SYSTEM_ARCHITECTURE.md) - High-level technical overview.
+
+---
+
 ## Current Project Structure
 
 ```

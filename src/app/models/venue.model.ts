@@ -8,6 +8,14 @@ export interface Venue {
   eventPhase: EventPhase;
   zones: Zone[];
   connections: ZoneConnection[];
+  center?: { lat: number; lng: number }; // Stadium center coords
+  isInitialized?: boolean;               // For blank-start flow
+  viewBounds?: {                         // ROI for schematic alignment
+    north: number;
+    south: number;
+    east: number;
+    west: number;
+  };
 }
 
 export type EventPhase = 'pre-game' | 'active' | 'halftime' | 'post-game';
@@ -25,6 +33,9 @@ export interface Zone {
   trend: 'rising' | 'falling' | 'stable';
   amenities: Amenity[];
   isOpen: boolean;
+  radius?: number;     // Optional override for map circle size
+  customIcon?: string; // Optional override for marker icon
+  geoPos?: { lat: number; lng: number }; // Precise GPS coords for satellite map
 }
 
 export type ZoneType =

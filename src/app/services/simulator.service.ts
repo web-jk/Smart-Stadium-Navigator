@@ -1,13 +1,18 @@
 import { Injectable, signal, computed, inject, NgZone } from '@angular/core';
 import { Firestore, doc, onSnapshot, setDoc } from '@angular/fire/firestore';
-import { Venue, Zone, EventPhase, getDensityLevel, DensityLevel } from '../models/venue.model';
+import { Venue, Zone, ZoneType, EventPhase, getDensityLevel, DensityLevel } from '../models/venue.model';
 import { STADIUM_DATA } from '../data/stadium.data';
+import { AlertService } from './alert.service';
 
 @Injectable({ providedIn: 'root' })
 export class SimulatorService {
   private firestore = inject(Firestore, { optional: true });
   private ngZone = inject(NgZone);
+  private alertService = inject(AlertService);
   private documentPath = 'stadiums/default';
+  private draftPath = 'stadiums/draft';
+  private isDesignModeActive = false;
+  private liveVenueData: Venue | null = null;
   private intervalId: ReturnType<typeof setInterval> | null = null;
   tickRate = 3000; // ms — public so admin can adjust
 
@@ -27,34 +32,95 @@ export class SimulatorService {
 
   constructor() {
     if (this.firestore) {
+      // Listen to the live document for users, or draft document for admin if we want, 
+      // but admin edits should primarily push. For simplicity, we just listen to default unless in design mode.
       const docRef = doc(this.firestore, this.documentPath);
       onSnapshot(docRef, (snapshot) => {
-        console.log('[FIREBASE] onSnapshot triggered! Exists:', snapshot.exists());
-        if (snapshot.exists()) {
+        if (snapshot.exists() && !this.isDesignModeActive) {
           const data = snapshot.data();
-          console.log('[FIREBASE] Fresh data received:', data);
+          const venue = data as Venue;
+          
+          // Dynamically repair positions to match latest X/Y mapping if geoPos exists
+          if (venue.center && venue.zones) {
+            venue.zones.forEach(z => {
+              if (z.geoPos) {
+                z.position = this.getSvgFromGeo(z.geoPos.lat, z.geoPos.lng, venue.center!, venue);
+              }
+            });
+          }
+
           this.ngZone.run(() => {
-            this.venue.set(data as Venue);
+            this.venue.set(venue);
           });
         }
-      }, (error) => {
-        console.error('[FIREBASE ERROR] Real-time sync disabled or disconnected:', error);
       });
+    }
+  }
+
+  setDesignMode(active: boolean) {
+    this.isDesignModeActive = active;
+    if (active) {
+      // Snapshot the current live state to protect the users from structural edits
+      this.liveVenueData = structuredClone(this.venue());
+    } else {
+      // If turning off without publishing, we could restore the old state, but 
+      // let's assume they want to keep working or use Cancel. We'll leave it in memory.
+      // this.liveVenueData = null; 
+    }
+  }
+
+  async publishToLive(): Promise<void> {
+    if (this.firestore) {
+      // Commit all structural changes to the live users
+      this.liveVenueData = null;
+      await this.syncToFirestore();
+    }
+  }
+
+  async saveDraft(): Promise<void> {
+    if (this.firestore) {
+      const draftRef = doc(this.firestore, this.draftPath);
+      await setDoc(draftRef, this.venue());
+    }
+  }
+
+  private mirrorLiveStateToBackup() {
+    if (!this.liveVenueData) return;
+    const current = this.venue();
+    this.liveVenueData.eventPhase = current.eventPhase;
+    this.liveVenueData.currentAttendance = current.currentAttendance;
+    // Mirror ONLY densities/live stats to surviving zones, DO NOT mirror positions or new spots
+    for (const liveZone of this.liveVenueData.zones) {
+      const currentZone = current.zones.find(z => z.id === liveZone.id);
+      if (currentZone) {
+        liveZone.crowdDensity = currentZone.crowdDensity;
+        liveZone.previousDensity = currentZone.previousDensity;
+        liveZone.waitTimeMinutes = currentZone.waitTimeMinutes;
+        liveZone.trend = currentZone.trend;
+      }
     }
   }
 
   private async syncToFirestore(): Promise<void> {
     if (this.firestore) {
       try {
-        console.log('[FIREBASE] Attempting to push venue data to Firestore...');
         const docRef = doc(this.firestore, this.documentPath);
-        await setDoc(docRef, this.venue());
-        console.log('[FIREBASE] Successfully pushed data to Firestore!');
+        
+        if (this.isDesignModeActive && this.liveVenueData) {
+          // Keep sending live density to default doc, but without structural changes!
+          this.mirrorLiveStateToBackup();
+          await setDoc(docRef, this.liveVenueData);
+          
+          // Sync the actual structural draft to draft doc
+          const draftRef = doc(this.firestore, this.draftPath);
+          await setDoc(draftRef, this.venue());
+        } else {
+          // Fully live mode, push everything to default
+          await setDoc(docRef, this.venue());
+        }
       } catch (err) {
         console.error('[FIREBASE ERROR] Failed to sync to Firestore: ', err);
       }
-    } else {
-      console.warn('[FIREBASE WARNING] this.firestore is missing! Cannot sync.');
     }
   }
 
@@ -80,21 +146,31 @@ export class SimulatorService {
       switch (event) {
         case 'goal':
           this.applyGoalScored(updated);
+          this.alertService.goalScored();
           break;
         case 'halftime':
           updated.eventPhase = 'halftime';
           this.applyHalftime(updated);
+          this.alertService.halftimeStarted();
           break;
         case 'rain':
           this.applyRainDelay(updated);
+          this.alertService.rainAlert();
           break;
         case 'end-halftime':
           updated.eventPhase = 'active';
           this.applyEndHalftime(updated);
+          this.alertService.halftimeEnding();
           break;
         case 'post-game':
           updated.eventPhase = 'post-game';
           this.applyPostGame(updated);
+          this.alertService.push({
+            message: '🏁 Match ended — Exits and stations will be busy',
+            severity: 'info',
+            icon: '🏁',
+            duration: 8000
+          });
           break;
       }
 
@@ -121,6 +197,179 @@ export class SimulatorService {
         zone.trend = zone.crowdDensity > zone.previousDensity ? 'rising' :
                      zone.crowdDensity < zone.previousDensity ? 'falling' : 'stable';
       }
+      return updated;
+    });
+    this.syncToFirestore();
+  }
+
+  /** Update a zone's position (for admin design mode) from SVG */
+  updateZonePosition(zoneId: string, x: number, y: number): void {
+    this.venue.update(v => {
+      const updated = structuredClone(v);
+      const zone = updated.zones.find(z => z.id === zoneId);
+      if (zone && v.center) {
+        zone.position = { x, y };
+        // Sync GPS
+        zone.geoPos = this.getGeoFromSvg(x, y, v.center, v);
+      }
+      return updated;
+    });
+    this.syncToFirestore();
+  }
+
+  /** Update multiple zone properties at once (including GPS drag) */
+  updateZoneProperties(zoneId: string, updates: Partial<Zone>): void {
+    this.venue.update(v => {
+      const updated = structuredClone(v);
+      const zoneIndex = updated.zones.findIndex(z => z.id === zoneId);
+      if (zoneIndex !== -1) {
+        const zone = { ...updated.zones[zoneIndex], ...updates };
+        // If GPS was updated, sync SVG position
+        if (updates.geoPos && v.center) {
+          zone.position = this.getSvgFromGeo(updates.geoPos.lat, updates.geoPos.lng, v.center, v);
+        }
+        updated.zones[zoneIndex] = zone;
+      }
+      return updated;
+    });
+    this.syncToFirestore();
+  }
+
+  /** Set view bounds for schematic alignment */
+  setViewBounds(bounds: { north: number, south: number, east: number, west: number }): void {
+    this.venue.update(v => {
+      const updated = structuredClone(v);
+      updated.viewBounds = bounds;
+      
+      // Recalculate ALL zone SVG positions based on new bounds
+      if (v.center) {
+        updated.zones = updated.zones.map(z => {
+          if (z.geoPos) {
+            z.position = this.getSvgFromGeo(z.geoPos.lat, z.geoPos.lng, v.center!, updated);
+          }
+          return z;
+        });
+      }
+      
+      return updated;
+    });
+    this.syncToFirestore();
+  }
+
+  /** Initialize a new venue (wipes existing data) */
+  initializeVenue(name: string, lat: number, lng: number): void {
+    const newVenue: Venue = {
+      id: 'stadium-' + Date.now(),
+      name: name,
+      type: 'stadium',
+      capacity: 50000,
+      currentAttendance: 0,
+      eventName: 'New Event',
+      eventPhase: 'pre-game',
+      isInitialized: true,
+      zones: [],
+      connections: [],
+      center: { lat, lng }
+    };
+    this.venue.set(newVenue);
+    this.syncToFirestore();
+  }
+
+  /** Reset the entire venue to initial preset state */
+  resetToInitialState(): void {
+    this.venue.set(structuredClone(STADIUM_DATA));
+    this.syncToFirestore();
+  }
+
+  /** Add a new zone/spot to the venue */
+  addZone(type: ZoneType, name: string, coords?: { x?: number, y?: number, lat?: number, lng?: number }): void {
+    this.venue.update(v => {
+      const updated = structuredClone(v);
+      const center = v.center || { lat: 0, lng: 0 };
+      
+      let position = { x: 200, y: 200 };
+      let geoPos = center ? { ...center } : undefined;
+
+      if (coords) {
+        if (coords.x !== undefined && coords.y !== undefined) {
+          position = { x: coords.x, y: coords.y };
+          geoPos = this.getGeoFromSvg(coords.x, coords.y, center, v);
+        } else if (coords.lat !== undefined && coords.lng !== undefined) {
+          geoPos = { lat: coords.lat, lng: coords.lng };
+          position = this.getSvgFromGeo(coords.lat, coords.lng, center, v);
+        }
+      }
+
+      const newZone: Zone = {
+        id: 'zone-' + Date.now(),
+        name,
+        type,
+        svgPathId: '',
+        position,
+        capacity: 1000,
+        crowdDensity: 0.1,
+        previousDensity: 0.1,
+        waitTimeMinutes: 0,
+        trend: 'stable',
+        amenities: [],
+        isOpen: true,
+        geoPos
+      };
+      updated.zones.push(newZone);
+      return updated;
+    });
+    this.syncToFirestore();
+  }
+
+  // ─── HELPERS ───────────────────────────────────────────────────
+
+  private getGeoFromSvg(x: number, y: number, center: {lat: number, lng: number}, venueOverride?: Venue) {
+    const venue = venueOverride || this.venue();
+    if (venue.viewBounds) {
+      const { north, south, east, west } = venue.viewBounds;
+      const lat = north - (y / 400) * (north - south);
+      const lng = west + (x / 400) * (east - west);
+      return { lat, lng };
+    }
+
+    // Fallback to legacy ARC mapping
+    const ARC = 111320;
+    const METERS_PER_PIXEL = 0.6;
+    const dy = (y - 200) * METERS_PER_PIXEL;
+    const dx = (x - 200) * METERS_PER_PIXEL;
+    const lat = center.lat - (dy / ARC);
+    const lng = center.lng + (dx / (ARC * Math.cos(center.lat * Math.PI / 180)));
+    return { lat, lng };
+  }
+
+  private getSvgFromGeo(lat: number, lng: number, center: {lat: number, lng: number}, venueOverride?: Venue) {
+    const venue = venueOverride || this.venue();
+    if (venue.viewBounds) {
+      const { north, south, east, west } = venue.viewBounds;
+      return {
+        x: ((lng - west) / (east - west)) * 400,
+        y: ((north - lat) / (north - south)) * 400
+      };
+    }
+
+    // Fallback to legacy ARC mapping
+    const ARC = 111320;
+    const METERS_PER_PIXEL = 0.6;
+    const dy = (center.lat - lat) * ARC;
+    const dx = (lng - center.lng) * ARC * Math.cos(center.lat * Math.PI / 180);
+    return {
+      x: 200 + (dx / METERS_PER_PIXEL),
+      y: 200 + (dy / METERS_PER_PIXEL)
+    };
+  }
+
+  /** Delete a zone from the venue */
+  deleteZone(zoneId: string): void {
+    this.venue.update(v => {
+      const updated = structuredClone(v);
+      updated.zones = updated.zones.filter(z => z.id !== zoneId);
+      // Also cleanup connections
+      updated.connections = updated.connections.filter(c => c.from !== zoneId && c.to !== zoneId);
       return updated;
     });
     this.syncToFirestore();

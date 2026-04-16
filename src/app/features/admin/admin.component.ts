@@ -3,13 +3,21 @@ import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { SimulatorService } from '../../services/simulator.service';
 import { AlertService } from '../../services/alert.service';
-import { EventPhase, getDensityLevel, getDensityColor, getDensityLabel } from '../../models/venue.model';
+import { 
+  Zone, 
+  EventPhase, 
+  getDensityLevel, 
+  getDensityColor, 
+  getDensityLabel 
+} from '../../models/venue.model';
 import { AuthService } from '../../services/auth.service';
+import { StadiumMapComponent } from '../map/stadium-map.component';
+import { EarthMapComponent } from '../google-map/earth-map.component';
 
 @Component({
   selector: 'app-admin',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, StadiumMapComponent, EarthMapComponent],
   template: `
     <div class="admin-shell">
       <!-- Header -->
@@ -23,987 +31,496 @@ import { AuthService } from '../../services/auth.service';
             <span class="connected-dot"></span>
             {{ connectedClients() }} clients
           </div>
-          <button class="back-btn" style="color: #ef4444; border-color: rgba(239, 68, 68, 0.3);" (click)="logout()">
-            Sign Out
-          </button>
-          <button class="back-btn" (click)="goBack()">
-            ← Back to App
-          </button>
+          <button class="header-btn" (click)="goBack()">← Back</button>
+          <button class="header-btn danger" (click)="resetVenue()">Reset System</button>
+          <button class="header-btn" (click)="logout()">Sign Out</button>
         </div>
       </header>
 
       <div class="admin-body">
-        <!-- Row 1: Phase + Stats -->
-        <div class="admin-grid-2">
-          <!-- Event Phase Selector -->
-          <section class="admin-card">
-            <h2 class="card-title">
-              <span class="card-icon">🎬</span> Event Phase
-            </h2>
-            <p class="card-desc">Control the game phase — crowd behavior shifts automatically.</p>
-            <div class="phase-buttons">
-              @for (phase of phases; track phase.value) {
-                <button
-                  class="phase-btn"
-                  [class.active]="currentPhase() === phase.value"
-                  (click)="setPhase(phase.value)">
-                  <span class="phase-emoji">{{ phase.icon }}</span>
-                  <span class="phase-label">{{ phase.label }}</span>
-                </button>
-              }
+        @if (!venue().isInitialized) {
+          <!-- STEP 1: INITIAL SEARCH & SETUP -->
+          <section class="admin-card setup-card animate-fade-in">
+            <div class="setup-header">
+              <h2 class="card-title">🚀 Initialize New Stadium</h2>
+              <p class="card-desc">Search for your venue or jump to coordinates to start building.</p>
             </div>
-          </section>
-
-          <!-- Venue Stats -->
-          <section class="admin-card">
-            <h2 class="card-title">
-              <span class="card-icon">📊</span> Venue Overview
-            </h2>
-            <div class="stats-grid">
-              <div class="stat-item">
-                <span class="stat-value">{{ venue().currentAttendance | number }}</span>
-                <span class="stat-label">Attendance</span>
-              </div>
-              <div class="stat-item">
-                <span class="stat-value">{{ venue().capacity | number }}</span>
-                <span class="stat-label">Capacity</span>
-              </div>
-              <div class="stat-item">
-                <span class="stat-value" [style.color]="avgDensityColor()">
-                  {{ (avgDensity() * 100).toFixed(0) }}%
-                </span>
-                <span class="stat-label">Avg Density</span>
-              </div>
-              <div class="stat-item">
-                <span class="stat-value hot-zones-count">{{ hotZonesCount() }}</span>
-                <span class="stat-label">Hot Zones</span>
-              </div>
-            </div>
-            <div class="occupancy-bar-wrapper">
-              <span class="stat-label">Overall Occupancy</span>
-              <div class="occupancy-bar">
-                <div class="occupancy-fill"
-                     [style.width.%]="(venue().currentAttendance / venue().capacity) * 100"
-                     [style.background]="'linear-gradient(90deg, #22c55e, #f59e0b, #ef4444)'">
-                </div>
-              </div>
-            </div>
-          </section>
-        </div>
-
-        <!-- Row 2: Event Triggers + Speed -->
-        <div class="admin-grid-2">
-          <!-- Event Triggers -->
-          <section class="admin-card">
-            <h2 class="card-title">
-              <span class="card-icon">⚡</span> Event Triggers
-            </h2>
-            <p class="card-desc">Fire instant events — watch the map react in real-time.</p>
-            <div class="trigger-buttons">
-              @for (trigger of triggers; track trigger.event) {
-                <button class="trigger-btn" [class]="'trigger-' + trigger.color"
-                        (click)="fireEvent(trigger.event)">
-                  <span class="trigger-icon">{{ trigger.icon }}</span>
-                  <span class="trigger-label">{{ trigger.label }}</span>
-                </button>
-              }
-            </div>
-          </section>
-
-          <!-- Custom Notification -->
-          <section class="admin-card">
-            <h2 class="card-title">
-              <span class="card-icon">✉️</span> Custom Notification
-            </h2>
-            <p class="card-desc">Broadcast a custom message to all connected users instantly.</p>
             
-            <div class="notification-form">
-              <div class="input-group">
-                <input 
-                  type="text" 
-                  class="custom-input" 
-                  placeholder="Type your message here..." 
-                  [value]="customMessage()"
-                  (input)="customMessage.set($any($event.target).value)"
-                  (keyup.enter)="sendCustomNotification()"
-                />
-              </div>
-
-              <div class="notification-meta-grid">
-                <div class="meta-select-group">
-                  <span class="meta-label-sm">Severity</span>
-                  <div class="severity-tabs">
-                    @for (opt of severityOptions; track opt.value) {
-                      <button 
-                        class="sev-tab" 
-                        [class.active]="selectedSeverity() === opt.value"
-                        [class]="'sev-' + opt.value"
-                        (click)="selectedSeverity.set(opt.value)">
-                        {{ opt.label }}
-                      </button>
-                    }
-                  </div>
-                </div>
-
-                <div class="meta-select-group">
-                  <span class="meta-label-sm">Icon</span>
-                  <div class="icon-picker">
-                    @for (icon of icons; track icon) {
-                      <button 
-                        class="icon-opt" 
-                        [class.active]="selectedIcon() === icon"
-                        (click)="selectedIcon.set(icon)">
-                        {{ icon }}
-                      </button>
-                    }
-                  </div>
-                </div>
-              </div>
-
-              <button 
-                class="send-btn" 
-                [disabled]="!customMessage().trim()"
-                (click)="sendCustomNotification()">
-                <span class="send-icon">🚀</span>
-                Broadcast to All Clients
-              </button>
-            </div>
-          </section>
-        </div>
-
-        <!-- Row 3: Simulator Speed -->
-        <section class="admin-card full-width" style="margin-bottom: 16px;">
-          <h2 class="card-title">
-            <span class="card-icon">⏱️</span> Simulator Speed & Control
-          </h2>
-          <div class="speed-row">
-            <div class="speed-buttons" style="margin-bottom: 0; flex: 1;">
-              @for (speed of speedOptions; track speed.value) {
-                <button class="speed-btn"
-                        [class.active]="currentSpeed() === speed.value"
-                        (click)="setSpeed(speed.value)">
-                  {{ speed.label }}
-                </button>
-              }
-            </div>
-            <div class="speed-info-bubble">
-              <span class="speed-label">Tick interval:</span>
-              <span class="speed-value">{{ (3000 / currentSpeed()) }}ms</span>
-            </div>
-          </div>
-        </section>
-
-        <!-- Row 3: Per-Zone Density Control -->
-        <section class="admin-card full-width">
-          <h2 class="card-title">
-            <span class="card-icon">🎚️</span> Zone Density Control
-          </h2>
-          <p class="card-desc">Manually adjust crowd density for any zone. Changes are applied instantly.</p>
-
-          <div class="zone-grid">
-            @for (zone of zones(); track zone.id) {
-              <div class="zone-slider-card">
-                <div class="zone-slider-header">
-                  <span class="zone-icon-sm">{{ getZoneIcon(zone.type) }}</span>
-                  <span class="zone-name-sm">{{ zone.name }}</span>
-                  <span class="zone-density-badge"
-                        [style.color]="getDensityColor(zone.crowdDensity)"
-                        [style.borderColor]="getDensityColor(zone.crowdDensity) + '44'">
-                    {{ (zone.crowdDensity * 100).toFixed(0) }}%
-                  </span>
-                </div>
-                <div class="slider-wrapper">
-                  <div class="slider-track">
-                    <div class="slider-fill"
-                         [style.width.%]="zone.crowdDensity * 100"
-                         [style.background]="getDensityColor(zone.crowdDensity)">
+            <div class="setup-map-container">
+              <app-earth-map 
+                [isAdminMode]="true"
+                (locationSelected)="onBaseLocationSelected($event)" />
+              
+              @if (pendingLocation()) {
+                <div class="setup-modal glass-strong animate-slide-up">
+                  <h3 class="modal-title">Venue Details</h3>
+                  <div class="modal-body">
+                    <div class="input-group">
+                      <label>Stadium Name</label>
+                      <input type="text" #nameInput placeholder="e.g. Wembley Stadium" 
+                             (input)="venueNameForInit.set(nameInput.value)" />
+                    </div>
+                    <div class="coords-display">
+                      📍 {{ pendingLocation()?.lat?.toFixed(5) }}, {{ pendingLocation()?.lng?.toFixed(5) }}
                     </div>
                   </div>
-                  <input type="range"
-                         class="density-slider"
-                         min="0" max="100" step="1"
-                         [value]="zone.crowdDensity * 100"
-                         (input)="onDensityChange(zone.id, $event)" />
+                  <div class="modal-footer">
+                    <button class="cancel-btn" (click)="pendingLocation.set(null)">Cancel</button>
+                    <button class="init-btn" [disabled]="!venueNameForInit()" (click)="confirmInitialize()">
+                      Initialize Stadium
+                    </button>
+                  </div>
                 </div>
-                <div class="zone-slider-meta">
-                  <span class="zone-meta-label" [style.color]="getDensityColor(zone.crowdDensity)">
-                    {{ getDensityLabel(zone.crowdDensity) }}
-                  </span>
-                  <span class="zone-meta-wait">
-                    @if (zone.waitTimeMinutes > 0) {
-                      ~{{ zone.waitTimeMinutes }}min wait
-                    } @else {
-                      No wait
-                    }
-                  </span>
+              }
+            </div>
+          </section>
+        } @else {
+          <!-- STEP 2: FULL DASHBOARD -->
+          
+          <!-- Map Viewer -->
+          <section class="admin-card full-width map-viewer-card">
+            <div class="card-header-flex">
+              <div class="header-main">
+                <h2 class="card-title">🗺️ {{ venue().name }} — Live View</h2>
+                <div class="view-toggle-pills">
+                  <button class="view-pill" [class.active]="!showSatellite()" (click)="showSatellite.set(false)">Schematic</button>
+                  <button class="view-pill" [class.active]="showSatellite()" (click)="showSatellite.set(true)">Satellite</button>
                 </div>
               </div>
-            }
+              <div class="card-actions">
+                @if (designMode()) {
+                  <button class="add-spot-btn" [class.active]="isPlacingSpot()" (click)="togglePlacementMode()">
+                    <span class="btn-icon">{{ isPlacingSpot() ? '📍' : '➕' }}</span> 
+                    {{ isPlacingSpot() ? 'Cancel' : 'Add Spot' }}
+                  </button>
+                  <div class="save-publish-group animate-slide-left">
+                    <button class="btn-save" (click)="saveDraft()">💾 Save</button>
+                    <button class="btn-publish" (click)="publishToLive()">🟢 Publish Live</button>
+                  </div>
+                }
+                <div class="design-mode-control">
+                  <span class="design-label" [class.active]="designMode()">Design Mode</span>
+                  <button class="toggle-switch" [class.active]="designMode()" (click)="toggleDesignMode()">
+                    <div class="switch-handle"></div>
+                  </button>
+                </div>
+              </div>
+            </div>
+            
+            <div class="admin-map-container" [class.design-active]="designMode()">
+              @if (showSatellite()) {
+                <app-earth-map 
+                  [isAdminMode]="designMode() || isPlacingSpot()"
+                  (locationSelected)="onBaseLocationSelected($event)"
+                  (gateClicked)="onZoneClickedById($event)" />
+              } @else {
+                <app-stadium-map 
+                  [isAdminMode]="designMode()"
+                  (zoneClicked)="onZoneClicked($event)"
+                  (zonePositionChanged)="onZoneMoved($event)"
+                  (backgroundClick)="onSchematicClick($event)" />
+              }
+            
+              @if (designMode() && selectedZoneForEdit()) {
+                <div class="property-sidebar animate-slide-left">
+                  <div class="sidebar-header">
+                    <span class="sidebar-title">Edit Zone</span>
+                    <button class="close-sidebar" (click)="selectedZoneForEdit.set(null)">✕</button>
+                  </div>
+                  <div class="sidebar-scroll">
+                    <div class="edit-group">
+                      <label class="edit-label">Name</label>
+                      <input type="text" class="edit-input" [value]="selectedZoneForEdit()?.name" (input)="updateZoneName($any($event.target).value)" />
+                    </div>
+                    <div class="edit-group">
+                      <label class="edit-label">Size ({{ selectedZoneForEdit()?.radius }})</label>
+                      <input type="range" class="edit-slider" min="10" max="60" [value]="selectedZoneForEdit()?.radius ?? 15" (input)="updateZoneRadius($any($event.target).value)" />
+                    </div>
+                    <div class="edit-group">
+                      <label class="edit-label">Icon</label>
+                      <div class="icon-grid-sm">
+                        @for (icon of zoneIcons; track icon) {
+                          <button class="icon-btn-sm" [class.active]="selectedZoneForEdit()?.customIcon === icon" (click)="updateZoneIcon(icon)">{{ icon }}</button>
+                        }
+                      </div>
+                    </div>
+                  </div>
+                  <div class="sidebar-footer">
+                    <button class="delete-btn-full" (click)="deleteZone(selectedZoneForEdit()!.id)">🗑️ Delete Spot</button>
+                  </div>
+                </div>
+              }
+
+              @if (isPlacingSpot()) {
+                <div class="design-overlay animate-fade-in" style="z-index: 2000;">
+                  <div class="design-badge" style="background: #22c55e;">📍 PLACEMENT MODE</div>
+                  <div class="design-hint">Click on the {{ showSatellite() ? 'map' : 'schematic' }} to place your spot</div>
+                </div>
+              }
+            </div>
+          </section>
+
+          <div class="admin-grid-2">
+            <!-- Event Phase -->
+            <section class="admin-card">
+              <h2 class="card-title">🎬 Event Phase</h2>
+              <div class="phase-buttons">
+                @for (p of phases; track p.value) {
+                  <button class="phase-btn" [class.active]="currentPhase() === p.value" (click)="setPhase(p.value)">
+                    <span>{{ p.icon }}</span> <span>{{ p.label }}</span>
+                  </button>
+                }
+              </div>
+            </section>
+
+            <!-- Stats -->
+            <section class="admin-card">
+              <h2 class="card-title">📊 Venue Overview</h2>
+              <div class="stats-grid">
+                <div class="stat-item">
+                  <span class="stat-value">{{ venue().currentAttendance | number }}</span>
+                  <span class="stat-label">Attendance</span>
+                </div>
+                <div class="stat-item">
+                  <span class="stat-value" [style.color]="avgDensityColor()">{{ (avgDensity() * 100).toFixed(0) }}%</span>
+                  <span class="stat-label">Avg Density</span>
+                </div>
+              </div>
+            </section>
           </div>
-        </section>
+
+          <!-- Triggers & Notifications -->
+          <div class="admin-grid-2">
+             <section class="admin-card">
+              <h2 class="card-title">⚡ Triggers</h2>
+              <div class="trigger-buttons">
+                @for (trig of triggers; track trig.event) {
+                  <button class="trigger-btn" [class]="'trigger-' + trig.color" (click)="fireEvent(trig.event)">
+                    <span>{{ trig.icon }}</span> <span>{{ trig.label }}</span>
+                  </button>
+                }
+              </div>
+            </section>
+
+            <section class="admin-card">
+              <h2 class="card-title">✉️ Broadcast Notification</h2>
+              <div class="notification-form">
+                <input type="text" class="custom-input" placeholder="Type message..." 
+                       [value]="customMessage()" (input)="customMessage.set($any($event.target).value)" (keyup.enter)="sendCustomNotification()" />
+                <button class="send-btn" [disabled]="!customMessage()" (click)="sendCustomNotification()">🚀 Send</button>
+              </div>
+            </section>
+          </div>
+
+          <!-- Density Sliders -->
+          <section class="admin-card full-width">
+            <h2 class="card-title">🎚️ Zone Density Control</h2>
+            <div class="zone-grid">
+              @for (z of zones(); track z.id) {
+                <div class="zone-slider-card">
+                  <div class="zone-slider-header">
+                    <span>{{ getZoneIcon(z.type) }}</span>
+                    <span>{{ z.name }}</span>
+                    <span [style.color]="getDensityColor(z.crowdDensity)">{{ (z.crowdDensity * 100).toFixed(0) }}%</span>
+                  </div>
+                  <input type="range" min="0" max="100" [value]="z.crowdDensity * 100" (input)="onDensityChange(z.id, $event)" />
+                </div>
+              }
+            </div>
+          </section>
+        }
       </div>
+
+       <!-- Add Zone Modal -->
+       @if (showAddZoneModal()) {
+        <div class="modal-overlay animate-fade-in">
+          <div class="admin-card add-zone-modal animate-slide-up">
+            <h2 class="modal-title">Enter Spot Details</h2>
+            <div class="modal-body">
+              <div class="input-group">
+                <label>Name</label>
+                <input type="text" #zName placeholder="e.g. North Burger" />
+              </div>
+              <div class="input-group">
+                <label>Category</label>
+                <select #zType class="styled-select">
+                  <option value="concession">🍔 Concession</option>
+                  <option value="restroom">🚻 Restroom</option>
+                  <option value="merchandise">👕 Merchandise</option>
+                  <option value="entrance">🚪 Entrance</option>
+                  <option value="vip">⭐ VIP</option>
+                  <option value="medical">🏥 Medical</option>
+                </select>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button class="cancel-btn" (click)="showAddZoneModal.set(false)">Cancel</button>
+              <button class="init-btn" (click)="addNewZone(zName.value, zType.value)">Create Spot</button>
+            </div>
+          </div>
+        </div>
+      }
     </div>
   `,
   styles: [`
-    .admin-shell {
-      min-height: 100dvh;
-      background: var(--color-bg-primary);
-      display: flex;
-      flex-direction: column;
-    }
-
-    /* ─── Header ─── */
-    .admin-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 16px 24px;
-      padding-top: max(16px, env(safe-area-inset-top));
-      position: sticky;
-      top: 0;
-      z-index: 50;
-      flex-wrap: wrap;
-      gap: 12px;
-    }
-
-    .header-left {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-    }
-
-    .admin-badge {
-      font-size: 0.65rem;
-      font-weight: 700;
-      letter-spacing: 0.06em;
-      color: #f59e0b;
-      background: rgba(245, 158, 11, 0.12);
-      border: 1px solid rgba(245, 158, 11, 0.3);
-      padding: 4px 10px;
-      border-radius: 99px;
-    }
-
-    .admin-title {
-      font-family: var(--font-display);
-      font-size: 1.2rem;
-      font-weight: 800;
-      color: var(--color-text-primary);
-      margin: 0;
-    }
-
-    .hl {
-      background: linear-gradient(135deg, #f59e0b, #ef4444);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-
-    .header-right {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-    }
-
-    .connected-badge {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 0.75rem;
-      font-weight: 600;
-      color: #22c55e;
-      padding: 5px 12px;
-      border-radius: 99px;
-      background: rgba(34, 197, 94, 0.1);
-      border: 1px solid rgba(34, 197, 94, 0.2);
-    }
-
-    .connected-dot {
-      width: 7px;
-      height: 7px;
-      background: #22c55e;
-      border-radius: 50%;
-      animation: live-pulse 2s ease-in-out infinite;
-    }
-
-    @keyframes live-pulse {
-      0%, 100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); }
-      50% { box-shadow: 0 0 0 6px rgba(34, 197, 94, 0); }
-    }
-
-    .back-btn {
-      font-size: 0.8rem;
-      font-weight: 600;
-      color: var(--color-text-secondary);
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid var(--color-border);
-      padding: 8px 16px;
-      border-radius: 10px;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-    .back-btn:hover {
-      color: var(--color-text-primary);
-      background: rgba(255, 255, 255, 0.08);
-    }
-
-    /* ─── Body ─── */
-    .admin-body {
-      flex: 1;
-      overflow-y: auto;
-      padding: 20px 24px 40px;
-    }
-
-    .admin-grid-2 {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 16px;
-      margin-bottom: 16px;
-    }
-
-    @media (max-width: 768px) {
-      .admin-grid-2 {
-        grid-template-columns: 1fr;
-      }
-    }
-
-    /* ─── Card ─── */
-    .admin-card {
-      background: var(--color-bg-card);
-      border-radius: 16px;
-      padding: 20px;
-      border: 1px solid var(--color-border);
-    }
-
-    .admin-card.full-width {
-      margin-bottom: 16px;
-    }
-
-    .card-title {
-      font-family: var(--font-display);
-      font-size: 1rem;
-      font-weight: 700;
-      color: var(--color-text-primary);
-      margin: 0 0 6px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .card-icon { font-size: 1rem; }
-
-    .card-desc {
-      font-size: 0.78rem;
-      color: var(--color-text-muted);
-      margin: 0 0 16px;
-      line-height: 1.4;
-    }
-
-    /* ─── Phase Buttons ─── */
-    .phase-buttons {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-    }
-
-    .phase-btn {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 6px;
-      padding: 14px 10px;
-      border-radius: 14px;
-      border: 1px solid var(--color-border);
-      background: rgba(255, 255, 255, 0.03);
-      color: var(--color-text-secondary);
-      cursor: pointer;
-      transition: all 0.25s;
-      font-family: var(--font-sans);
-    }
-
-    .phase-btn:hover {
-      background: rgba(255, 255, 255, 0.06);
-      border-color: rgba(255, 255, 255, 0.15);
-    }
-
-    .phase-btn.active {
-      background: rgba(99, 102, 241, 0.12);
-      border-color: rgba(99, 102, 241, 0.5);
-      color: var(--color-text-primary);
-      box-shadow: 0 0 16px rgba(99, 102, 241, 0.15);
-    }
-
-    .phase-emoji { font-size: 1.5rem; }
-    .phase-label {
-      font-size: 0.75rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-    }
-
-    /* ─── Stats ─── */
-    .stats-grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 12px;
-      margin-bottom: 16px;
-    }
-
-    .stat-item {
-      background: rgba(255, 255, 255, 0.03);
-      border-radius: 12px;
-      padding: 12px;
-      border: 1px solid var(--color-border);
-      text-align: center;
-    }
-
-    .stat-value {
-      display: block;
-      font-family: var(--font-display);
-      font-size: 1.3rem;
-      font-weight: 800;
-      color: var(--color-text-primary);
-    }
-
-    .hot-zones-count { color: #ef4444; }
-
-    .stat-label {
-      font-size: 0.65rem;
-      color: var(--color-text-muted);
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-    }
-
-    .occupancy-bar-wrapper {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-
-    .occupancy-bar {
-      height: 8px;
-      background: rgba(255, 255, 255, 0.08);
-      border-radius: 4px;
-      overflow: hidden;
-    }
-
-    .occupancy-fill {
-      height: 100%;
-      border-radius: 4px;
-      transition: width 0.6s ease;
-    }
-
-    /* ─── Trigger Buttons ─── */
-    .trigger-buttons {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-
-    .trigger-btn {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 14px 18px;
-      border-radius: 14px;
-      border: 1px solid var(--color-border);
-      background: rgba(255, 255, 255, 0.03);
-      color: var(--color-text-primary);
-      cursor: pointer;
-      font-family: var(--font-sans);
-      font-size: 0.9rem;
-      font-weight: 600;
-      transition: all 0.25s;
-    }
-
-    .trigger-btn:hover { transform: translateY(-1px); }
-    .trigger-btn:active { transform: translateY(0); }
-
-    .trigger-amber { border-color: rgba(245, 158, 11, 0.3); }
-    .trigger-amber:hover { background: rgba(245, 158, 11, 0.1); box-shadow: 0 0 16px rgba(245, 158, 11, 0.15); }
-
-    .trigger-blue { border-color: rgba(59, 130, 246, 0.3); }
-    .trigger-blue:hover { background: rgba(59, 130, 246, 0.1); box-shadow: 0 0 16px rgba(59, 130, 246, 0.15); }
-
-    .trigger-green { border-color: rgba(34, 197, 94, 0.3); }
-    .trigger-green:hover { background: rgba(34, 197, 94, 0.1); box-shadow: 0 0 16px rgba(34, 197, 94, 0.15); }
-
-    .trigger-red { border-color: rgba(239, 68, 68, 0.3); }
-    .trigger-red:hover { background: rgba(239, 68, 68, 0.1); box-shadow: 0 0 16px rgba(239, 68, 68, 0.15); }
-
-    .trigger-icon { font-size: 1.3rem; }
-    .trigger-label { flex: 1; text-align: left; }
-
-    /* ─── Speed ─── */
-    .speed-buttons {
-      display: flex;
-      gap: 10px;
-      margin-bottom: 16px;
-    }
-
-    .speed-btn {
-      flex: 1;
-      padding: 12px 8px;
-      border-radius: 12px;
-      border: 1px solid var(--color-border);
-      background: rgba(255, 255, 255, 0.03);
-      color: var(--color-text-secondary);
-      font-family: var(--font-display);
-      font-size: 1rem;
-      font-weight: 700;
-      cursor: pointer;
-      transition: all 0.25s;
-    }
-
-    .speed-btn:hover {
-      background: rgba(255, 255, 255, 0.06);
-    }
-
-    .speed-btn.active {
-      background: rgba(34, 197, 94, 0.12);
-      border-color: rgba(34, 197, 94, 0.5);
-      color: #22c55e;
-      box-shadow: 0 0 12px rgba(34, 197, 94, 0.15);
-    }
-
-    .speed-info {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      font-size: 0.8rem;
-    }
-
-    .speed-row {
-      display: flex;
-      align-items: center;
-      gap: 20px;
-      flex-wrap: wrap;
-    }
-
-    .speed-info-bubble {
-      background: rgba(255, 255, 255, 0.05);
-      padding: 8px 16px;
-      border-radius: 99px;
-      border: 1px solid var(--color-border);
-      display: flex;
-      gap: 8px;
-      align-items: center;
-    }
-
-    /* ─── Notification Form ─── */
-    .notification-form {
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-    }
-
-    .custom-input {
-      width: 100%;
-      background: rgba(0, 0, 0, 0.2);
-      border: 1px solid var(--color-border);
-      color: var(--color-text-primary);
-      padding: 12px 16px;
-      border-radius: 12px;
-      font-family: var(--font-sans);
-      font-size: 0.9rem;
-      transition: all 0.2s;
-    }
-
-    .custom-input:focus {
-      outline: none;
-      border-color: #6366f1;
-      background: rgba(0, 0, 0, 0.3);
-      box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);
-    }
-
-    .notification-meta-grid {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-
-    .meta-select-group {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-
-    .meta-label-sm {
-      font-size: 0.7rem;
-      font-weight: 700;
-      color: var(--color-text-muted);
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-    }
-
-    .severity-tabs {
-      display: flex;
-      gap: 6px;
-    }
-
-    .sev-tab {
-      flex: 1;
-      padding: 8px 4px;
-      border-radius: 8px;
-      font-size: 0.75rem;
-      font-weight: 600;
-      background: rgba(255, 255, 255, 0.03);
-      border: 1px solid var(--color-border);
-      color: var(--color-text-secondary);
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-
-    .sev-tab.active.sev-info { background: rgba(59, 130, 246, 0.15); border-color: #3b82f6; color: #60a5fa; }
-    .sev-tab.active.sev-success { background: rgba(34, 197, 94, 0.15); border-color: #22c55e; color: #4ade80; }
-    .sev-tab.active.sev-warning { background: rgba(245, 158, 11, 0.15); border-color: #f59e0b; color: #fbbf24; }
-
-    .icon-picker {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-    }
-
-    .icon-opt {
-      width: 36px;
-      height: 36px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: 8px;
-      background: rgba(255, 255, 255, 0.03);
-      border: 1px solid var(--color-border);
-      cursor: pointer;
-      font-size: 1.1rem;
-      transition: all 0.2s;
-    }
-
-    .icon-opt:hover { background: rgba(255, 255, 255, 0.08); }
-    .icon-opt.active {
-      background: rgba(99, 102, 241, 0.15);
-      border-color: #6366f1;
-      transform: scale(1.1);
-    }
-
-    .send-btn {
-      margin-top: 4px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 10px;
-      padding: 14px;
-      border-radius: 12px;
-      background: linear-gradient(135deg, #6366f1, #4f46e5);
-      color: white;
-      font-weight: 700;
-      font-size: 0.9rem;
-      border: none;
-      cursor: pointer;
-      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-      box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
-    }
-
-    .send-btn:hover:not(:disabled) {
-      transform: translateY(-2px);
-      box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4);
-      background: linear-gradient(135deg, #7477f3, #5a52ef);
-    }
-
-    .send-btn:active:not(:disabled) {
-      transform: translateY(0);
-    }
-
-    .send-btn:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-      filter: grayscale(1);
-    }
-
-    .send-icon { font-size: 1.1rem; }
-
-    .speed-label { color: var(--color-text-muted); }
-    .speed-value {
-      color: var(--color-text-primary);
-      font-weight: 600;
-      font-family: var(--font-display);
-    }
-
-    /* ─── Zone Sliders ─── */
-    .zone-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-      gap: 12px;
-    }
-
-    @media (max-width: 640px) {
-      .zone-grid {
-        grid-template-columns: 1fr;
-      }
-    }
-
-    .zone-slider-card {
-      background: rgba(255, 255, 255, 0.03);
-      border-radius: 14px;
-      padding: 14px;
-      border: 1px solid var(--color-border);
-      transition: border-color 0.2s;
-    }
-
-    .zone-slider-card:hover {
-      border-color: rgba(255, 255, 255, 0.15);
-    }
-
-    .zone-slider-header {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 10px;
-    }
-
-    .zone-icon-sm { font-size: 1rem; }
-    .zone-name-sm {
-      flex: 1;
-      font-size: 0.85rem;
-      font-weight: 600;
-      color: var(--color-text-primary);
-    }
-
-    .zone-density-badge {
-      font-size: 0.8rem;
-      font-weight: 800;
-      font-family: var(--font-display);
-      padding: 2px 8px;
-      border-radius: 8px;
-      border: 1px solid;
-      background: rgba(255, 255, 255, 0.03);
-    }
-
-    .slider-wrapper {
-      position: relative;
-      height: 20px;
-      margin-bottom: 8px;
-    }
-
-    .slider-track {
-      position: absolute;
-      top: 50%;
-      left: 0;
-      right: 0;
-      height: 6px;
-      transform: translateY(-50%);
-      background: rgba(255, 255, 255, 0.08);
-      border-radius: 3px;
-      overflow: hidden;
-      pointer-events: none;
-    }
-
-    .slider-fill {
-      height: 100%;
-      border-radius: 3px;
-      transition: width 0.15s ease, background 0.3s ease;
-    }
-
-    .density-slider {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      -webkit-appearance: none;
-      appearance: none;
-      background: transparent;
-      cursor: pointer;
-      margin: 0;
-    }
-
-    .density-slider::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      width: 18px;
-      height: 18px;
-      border-radius: 50%;
-      background: var(--color-text-primary);
-      border: 2px solid var(--color-bg-card);
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
-    }
-
-    .density-slider::-moz-range-thumb {
-      width: 18px;
-      height: 18px;
-      border-radius: 50%;
-      background: var(--color-text-primary);
-      border: 2px solid var(--color-bg-card);
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
-    }
-
-    .zone-slider-meta {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    .zone-meta-label {
-      font-size: 0.75rem;
-      font-weight: 600;
-    }
-
-    .zone-meta-wait {
-      font-size: 0.72rem;
-      color: var(--color-text-muted);
-    }
+    .admin-shell { min-height: 100vh; background: var(--color-bg-primary); color: white; }
+    .glass-strong { background: rgba(20, 20, 20, 0.8); backdrop-filter: blur(12px); border-bottom: 1px solid rgba(255,255,255,0.1); }
+    .admin-header { display: flex; justify-content: space-between; padding: 16px 24px; position: sticky; top: 0; z-index: 1000; }
+    .header-right { display: flex; gap: 12px; align-items: center; }
+    .header-btn { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #ccc; padding: 6px 14px; border-radius: 99px; cursor: pointer; font-size: 0.8rem; }
+    .header-btn.danger { color: #ef4444; border-color: rgba(239, 68, 68, 0.2); }
+    .admin-body { padding: 24px; display: flex; flex-direction: column; gap: 24px; max-width: 1400px; margin: 0 auto; }
+    .admin-card { background: rgba(30, 30, 30, 0.4); border: 1px solid rgba(255,255,255,0.05); border-radius: 20px; padding: 24px; }
+    .full-width { width: 100%; }
+    .map-viewer-card { padding: 0; overflow: hidden; }
+    .card-header-flex { padding: 20px 24px; display: flex; justify-content: space-between; align-items: center; }
+    .card-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .save-publish-group { display: flex; gap: 8px; margin-right: 16px; border-right: 1px solid rgba(255,255,255,0.1); padding-right: 16px; }
+    .btn-save { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: white; padding: 6px 16px; border-radius: 8px; cursor: pointer; font-size: 0.8rem; font-weight: 600; }
+    .btn-publish { background: #16a34a; border: none; color: white; padding: 6px 16px; border-radius: 8px; cursor: pointer; font-size: 0.8rem; font-weight: 700; box-shadow: 0 0 10px rgba(22,163,74,0.3); }
+    .setup-map-container { height: 500px; position: relative; border-radius: 12px; overflow: hidden; margin-top: 16px; border: 1px solid rgba(255,255,255,0.1); }
+    .admin-map-container { height: 500px; position: relative; background: #000; border-bottom: 2px solid transparent; transition: border-color 0.3s; }
+    .admin-map-container.design-active { border-color: #6366f1; }
+    .view-toggle-pills { display: flex; background: rgba(0,0,0,0.3); padding: 4px; border-radius: 99px; }
+    .view-pill { background: none; border: none; color: #777; padding: 4px 12px; border-radius: 99px; cursor: pointer; font-size: 0.75rem; }
+    .view-pill.active { background: #6366f1; color: white; }
+    .add-spot-btn { background: rgba(34, 197, 94, 0.1); color: #22c55e; border: 1px solid rgba(34,197,94,0.3); padding: 8px 16px; border-radius: 99px; cursor: pointer; font-size: 0.8rem; font-weight: 700; }
+    .add-spot-btn.active { background: #ef4444; color: white; border-color: #ef4444; }
+    .admin-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+    .phase-buttons { display: flex; gap: 10px; }
+    .phase-btn { flex: 1; display: flex; flex-direction: column; align-items: center; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); padding: 12px; border-radius: 12px; cursor: pointer; color: #888; }
+    .phase-btn.active { background: #6366f1; color: white; border-color: #6366f1; }
+    .stats-grid { display: flex; gap: 40px; margin-top: 10px; }
+    .stat-item { display: flex; flex-direction: column; }
+    .stat-value { font-size: 1.5rem; font-weight: 700; }
+    .stat-label { font-size: 0.75rem; color: #777; }
+    .trigger-buttons { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    .trigger-btn { padding: 10px; border-radius: 10px; border: none; cursor: pointer; font-weight: 700; font-size: 0.75rem; color: white; }
+    .trigger-green { background: #166534; } .trigger-blue { background: #1e40af; } .trigger-amber { background: #92400e; } .trigger-red { background: #991b1b; }
+    .notification-form { display: flex; gap: 10px; }
+    .custom-input { flex: 1; background: #222; border: 1px solid #444; padding: 10px; border-radius: 10px; color: white; }
+    .send-btn { background: #6366f1; border: none; padding: 0 20px; border-radius: 10px; color: white; cursor: pointer; font-weight: 700; }
+    .zone-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; }
+    .zone-slider-card { background: rgba(255,255,255,0.03); padding: 12px; border-radius: 12px; }
+    .zone-slider-header { display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 8px; }
+    .property-sidebar { position: absolute; right: 0; top: 0; bottom: 0; width: 260px; background: rgba(20,20,20,0.95); border-left: 1px solid #333; z-index: 1001; padding: 20px; }
+    .edit-group { margin-bottom: 20px; }
+    .edit-label { display: block; font-size: 0.7rem; color: #777; margin-bottom: 6px; }
+    .edit-input { width: 100%; background: #222; border: 1px solid #444; padding: 8px; border-radius: 8px; color: white; }
+    .icon-grid-sm { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
+    .icon-btn-sm { padding: 6px; background: none; border: 1px solid transparent; cursor: pointer; }
+    .icon-btn-sm.active { border-color: #6366f1; border-radius: 4px; }
+    .design-overlay { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); text-align: center; }
+    .design-badge { padding: 4px 12px; border-radius: 99px; font-size: 0.7rem; font-weight: 800; }
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 2000; }
+    .setup-modal { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 2000; padding: 24px; border-radius: 16px; width: 340px; box-shadow: 0 10px 40px rgba(0,0,0,0.8); }
+    .modal-title { margin: 0 0 16px 0; font-size: 1.25rem; font-weight: 700; }
+    .input-group { margin-bottom: 16px; display: flex; flex-direction: column; gap: 6px; }
+    .input-group label { font-size: 0.75rem; color: #aaa; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+    .input-group input, .input-group select { background: #222; border: 1px solid #444; padding: 10px; border-radius: 8px; color: white; width: 100%; box-sizing: border-box; }
+    .coords-display { font-size: 0.8rem; color: #818cf8; margin-bottom: 16px; background: rgba(99,102,241,0.1); padding: 8px; border-radius: 8px; text-align: center; border: 1px solid rgba(99,102,241,0.2); }
+    .modal-footer { display: flex; gap: 10px; margin-top: 24px; }
+    .cancel-btn { flex: 1; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); padding: 12px; border-radius: 10px; color: white; cursor: pointer; font-weight: 600; }
+    .add-zone-modal { width: 340px; }
+    .init-btn { flex: 2; background: #6366f1; padding: 12px; border: none; border-radius: 10px; color: white; font-weight: 700; cursor: pointer; }
+    .delete-btn-full { background: rgba(239, 68, 68, 0.1); color: #ef4444; border: 1px solid #ef4444; width: 100%; padding: 10px; border-radius: 8px; cursor: pointer; margin-top: 20px; }
+    .design-mode-control { display: flex; align-items: center; gap: 10px; }
+    .toggle-switch { width: 40px; height: 20px; background: #444; border-radius: 20px; position: relative; border: none; cursor: pointer; }
+    .toggle-switch.active { background: #6366f1; }
+    .switch-handle { width: 16px; height: 16px; background: white; border-radius: 50%; position: absolute; top: 2px; left: 2px; transition: 0.2s; }
+    .toggle-switch.active .switch-handle { left: 22px; }
   `]
 })
 export class AdminComponent implements OnInit, OnDestroy {
   private simulator = inject(SimulatorService);
+  private auth = inject(AuthService);
   private alertService = inject(AlertService);
   private router = inject(Router);
-  private authService = inject(AuthService);
 
-  // ─── Phase Control ─────────────────────────────────────────
-  phases = [
-    { value: 'pre-game' as EventPhase, label: 'Pre-Game', icon: '⏳' },
-    { value: 'active' as EventPhase, label: 'Active', icon: '⚡' },
-    { value: 'halftime' as EventPhase, label: 'Halftime', icon: '⏸️' },
-    { value: 'post-game' as EventPhase, label: 'Post-Game', icon: '🏁' },
-  ];
-
-  // ─── Triggers ──────────────────────────────────────────────
-  triggers = [
-    { event: 'goal' as const, label: 'Goal Scored!', icon: '⚽', color: 'amber' },
-    { event: 'halftime' as const, label: 'Start Halftime', icon: '⏸️', color: 'blue' },
-    { event: 'end-halftime' as const, label: 'End Halftime', icon: '▶️', color: 'green' },
-    { event: 'rain' as const, label: 'Rain Delay', icon: '🌧️', color: 'blue' },
-    { event: 'post-game' as const, label: 'Post-Game Rush', icon: '🏁', color: 'red' },
-  ];
-
-  // ─── Speed ─────────────────────────────────────────────────
-  speedOptions = [
-    { value: 1, label: '1×' },
-    { value: 2, label: '2×' },
-    { value: 5, label: '5×' },
-    { value: 10, label: '10×' },
-  ];
-
-  // ─── Custom Notification ───────────────────────────────────
-  customMessage = signal('');
-  selectedSeverity = signal<'info' | 'warning' | 'success'>('info');
-  selectedIcon = signal('📢');
-  
-  severityOptions = [
-    { value: 'info' as const, label: 'Info', icon: 'ℹ️' },
-    { value: 'success' as const, label: 'Success', icon: '✅' },
-    { value: 'warning' as const, label: 'Warning', icon: '⚠️' },
-  ];
-
-  icons = ['📢', '🚨', '🎫', '🌭', '🚻', '🌧️', '⚽', '🏆'];
-
-  currentSpeed = signal(1);
-  connectedClients = signal(0);
-  private clientInterval: ReturnType<typeof setInterval> | null = null;
-
-  // ─── Computed ──────────────────────────────────────────────
+  // Core signals
   venue = computed(() => this.simulator.venue());
   zones = computed(() => this.simulator.venue().zones);
   currentPhase = computed(() => this.simulator.eventPhase());
+  connectedClients = signal(0);
+  
+  // UI States
+  showSatellite = signal(false);
+  designMode = signal(false);
+  isPlacingSpot = signal(false);
+  showAddZoneModal = signal(false);
+  selectedZoneForEdit = signal<Zone | null>(null);
+  
+  // Forms/Pending
+  pendingLocation = signal<{ lat: number; lng: number } | null>(null);
+  pendingPlacement = signal<{ x?: number, y?: number, lat?: number, lng?: number } | null>(null);
+  venueNameForInit = signal('');
+  customMessage = signal('');
+  selectedSeverity = signal<'info' | 'success' | 'warning' | 'critical'>('info');
+  selectedIcon = signal('🔔');
+  
+  private clientInterval: any;
+
+  zoneIcons = ['🍔', '🚻', '👕', '⭐', '🏥', '🚶', '🚪', '🎟️', '🍟', '🍻', '🥤'];
+  phases = [
+    { value: 'pre-game', label: 'Pre-Match', icon: '🎟️' },
+    { value: 'active', label: 'In Play', icon: '🏏' },
+    { value: 'halftime', label: 'Innings Break', icon: '🥪' },
+    { value: 'post-game', label: 'Match Over', icon: '🏁' }
+  ];
+  triggers = [
+    { event: 'goal', label: 'Wicket!', icon: '☝️', color: 'red' },
+    { event: 'halftime', label: 'Innings Break', icon: '🥤', color: 'blue' },
+    { event: 'end-halftime', label: 'Resume Play', icon: '🏏', color: 'green' },
+    { event: 'rain', label: 'Rain Delay', icon: '🌧️', color: 'amber' },
+    { event: 'post-game', label: 'Final Over', icon: '🏁', color: 'red' }
+  ];
 
   avgDensity = computed(() => {
     const z = this.zones();
-    return z.reduce((sum, zone) => sum + zone.crowdDensity, 0) / z.length;
+    return z.length ? z.reduce((sum, zone) => sum + zone.crowdDensity, 0) / z.length : 0;
   });
-
   avgDensityColor = computed(() => getDensityColor(this.avgDensity()));
-
-  hotZonesCount = computed(() =>
-    this.zones().filter(z => getDensityLevel(z.crowdDensity) === 'high' || getDensityLevel(z.crowdDensity) === 'critical').length
-  );
 
   // Expose to template
   getDensityColor = getDensityColor;
+  getDensityLevel = getDensityLevel;
   getDensityLabel = getDensityLabel;
 
-  ngOnInit(): void {
-    // We completely stop the automatic simulator tick. Admin ONLY manipulates manually.
-    // this.simulator.start();
-
-    // Simulate connected clients fluctuation
+  ngOnInit() {
     this.connectedClients.set(Math.floor(Math.random() * 200) + 800);
     this.clientInterval = setInterval(() => {
-      this.connectedClients.update(v => v + Math.floor(Math.random() * 40) - 20);
+      this.connectedClients.update(v => v + Math.floor(Math.random() * 20) - 10);
     }, 5000);
   }
 
-  ngOnDestroy(): void {
+  ngOnDestroy() {
     if (this.clientInterval) clearInterval(this.clientInterval);
   }
 
-  goBack(): void {
-    this.router.navigate(['/']);
-  }
-
-  logout(): void {
-    this.authService.logout();
-  }
-
-  setPhase(phase: EventPhase): void {
-    this.simulator.setPhase(phase);
-
-    // Fire matching alert
-    if (phase === 'halftime') this.alertService.halftimeStarted();
-    if (phase === 'active') this.alertService.halftimeEnding();
-  }
-
-  fireEvent(event: 'goal' | 'halftime' | 'rain' | 'end-halftime' | 'post-game'): void {
-    this.simulator.triggerEvent(event);
-
-    // Fire matching alert
-    switch (event) {
-      case 'goal': this.alertService.goalScored(); break;
-      case 'halftime': this.alertService.halftimeStarted(); break;
-      case 'end-halftime': this.alertService.halftimeEnding(); break;
-      case 'rain': this.alertService.rainAlert(); break;
-      case 'post-game':
-        this.alertService.push({
-          message: '🏁 Game over! Exit gates are getting crowded',
-          severity: 'warning',
-          icon: '🏁',
-          duration: 7000
-        });
-        break;
+  // ─── Header Actions ────────────────────────────────────────
+  goBack() { this.router.navigate(['/']); }
+  logout() { this.auth.logout(); this.router.navigate(['/']); }
+  resetVenue() {
+    if (window.confirm('⚠️ Reset entire stadium? This wipes all spots and data.')) {
+      this.simulator.resetToInitialState();
+      this.alertService.push({ 
+        message: '♻️ System Reset Successfully', 
+        severity: 'warning', 
+        icon: '🧹',
+        duration: 5000 
+      });
     }
   }
 
-  setSpeed(multiplier: number): void {
-    this.currentSpeed.set(multiplier);
-    // Stop and restart with new tick rate
-    this.simulator.stop();
-    (this.simulator as any).tickRate = 3000 / multiplier;
-    // this.simulator.start(); // Disabled to allow purely manual control
+  // ─── Search & Deployment ──────────────────────────────────
+  onBaseLocationSelected(coords: { lat: number; lng: number }) {
+    if (!this.venue().isInitialized) {
+      this.pendingLocation.set(coords);
+    } else if (this.isPlacingSpot()) {
+      this.pendingPlacement.set(coords);
+      this.isPlacingSpot.set(false);
+      this.showAddZoneModal.set(true);
+    } else if (this.designMode()) {
+       this.simulator.updateZoneProperties(this.selectedZoneForEdit()?.id || '', { geoPos: coords });
+    }
   }
 
-  onDensityChange(zoneId: string, event: Event): void {
-    const value = (event.target as HTMLInputElement).valueAsNumber / 100;
-    this.simulator.setZoneDensity(zoneId, value);
+  confirmInitialize() {
+    if (this.pendingLocation()) {
+      this.simulator.initializeVenue(this.venueNameForInit(), this.pendingLocation()!.lat, this.pendingLocation()!.lng);
+      this.pendingLocation.set(null);
+    }
+  }
+
+  // ─── Placement & Spots ─────────────────────────────────────
+  togglePlacementMode() {
+    this.isPlacingSpot.update(v => !v);
+    if (this.isPlacingSpot()) this.designMode.set(false);
+  }
+
+  onSchematicClick(coords: { x: number, y: number }) {
+    if (this.isPlacingSpot()) {
+      this.pendingPlacement.set(coords);
+      this.isPlacingSpot.set(false);
+      this.showAddZoneModal.set(true);
+    }
+  }
+
+  addNewZone(name: string, type: string) {
+    if (!name.trim()) return;
+    this.simulator.addZone(type as any, name, this.pendingPlacement() || undefined);
+    this.showAddZoneModal.set(false);
+    this.pendingPlacement.set(null);
+  }
+
+  deleteZone(id: string) {
+    if (confirm('Delete this spot?')) {
+      this.simulator.deleteZone(id);
+      this.selectedZoneForEdit.set(null);
+    }
+  }
+
+  // ─── Live Controls ─────────────────────────────────────────
+  setPhase(phase: string) { this.simulator.setPhase(phase as any); }
+  fireEvent(event: any) { this.simulator.triggerEvent(event); }
+  onDensityChange(id: string, event: Event) {
+    this.simulator.setZoneDensity(id, (event.target as HTMLInputElement).valueAsNumber / 100);
+  }
+
+  // ─── Design Mode ───────────────────────────────────────────
+  toggleDesignMode() { 
+    this.designMode.update(v => !v); 
+    this.simulator.setDesignMode(this.designMode());
+    if (!this.designMode()) {
+      this.selectedZoneForEdit.set(null); 
+      this.isPlacingSpot.set(false);
+    }
+  }
+
+  async saveDraft() {
+    await this.simulator.saveDraft();
+    this.alertService.push({ message: 'Local Draft Saved Successfully', severity: 'info', icon: '💾', duration: 3000 } as any);
+  }
+
+  async publishToLive() {
+    if (confirm('Deploy stadium changes to all clients? This will make your current draft the live version.')) {
+      await this.simulator.publishToLive();
+      this.alertService.push({ message: 'Stadium Published to Live', severity: 'success', icon: '🚀', duration: 5000 } as any);
+    }
+  }
+
+  onZoneClicked(zone: Zone) { if (this.designMode()) this.selectedZoneForEdit.set(zone); }
+  onZoneClickedById(id: string) { 
+    const zone = this.zones().find(z => z.id === id);
+    if (zone && this.designMode()) this.selectedZoneForEdit.set(zone);
+  }
+  onZoneMoved(event: any) { this.simulator.updateZonePosition(event.zoneId, event.x, event.y); }
+
+  // ─── Editing ───────────────────────────────────────────────
+  updateZoneName(name: string) {
+    if (this.selectedZoneForEdit()) this.simulator.updateZoneProperties(this.selectedZoneForEdit()!.id, { name });
+  }
+  updateZoneRadius(val: string) {
+    if (this.selectedZoneForEdit()) this.simulator.updateZoneProperties(this.selectedZoneForEdit()!.id, { radius: parseInt(val, 10) });
+  }
+  updateZoneIcon(icon: string) {
+    if (this.selectedZoneForEdit()) this.simulator.updateZoneProperties(this.selectedZoneForEdit()!.id, { customIcon: icon });
+  }
+
+  sendCustomNotification() {
+    if (this.customMessage().trim()) {
+      this.alertService.push({ 
+        message: this.customMessage(), 
+        severity: 'info', 
+        icon: '📢',
+        duration: 5000
+      });
+      this.customMessage.set('');
+    }
   }
 
   getZoneIcon(type: string): string {
-    const icons: Record<string, string> = {
-      'entrance': '🚪', 'concession': '🍔', 'restroom': '🚻',
-      'seating': '💺', 'merchandise': '👕', 'vip': '⭐',
-      'exit': '🚪', 'medical': '🏥', 'corridor': '🚶'
-    };
+    const icons: Record<string, string> = { 'concession': '🍔', 'restroom': '🚻', 'entrance': '🚪', 'seating': '💺' };
     return icons[type] ?? '📍';
-  }
-
-  sendCustomNotification(): void {
-    const message = this.customMessage().trim();
-    if (!message) return;
-
-    this.alertService.push({
-      message,
-      severity: this.selectedSeverity(),
-      icon: this.selectedIcon(),
-      duration: 6000
-    });
-
-    // Reset message
-    this.customMessage.set('');
   }
 }
