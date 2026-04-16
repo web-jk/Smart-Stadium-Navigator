@@ -33,7 +33,7 @@ import { Component, output } from '@angular/core';
               </defs>
             </svg>
           </div>
-          <div class="live-badge animate-pulse-soft">
+          <div class="live-badge">
             <span class="live-dot" aria-hidden="true"></span>
             LIVE
           </div>
@@ -161,8 +161,8 @@ import { Component, output } from '@angular/core';
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      background: rgba(34, 197, 94, 0.15);
-      color: #22c55e;
+      background: rgba(34, 197, 94, 0.1);
+      color: #4ade80; /* Brighter green for better contrast */
       font-size: 0.7rem;
       font-weight: 700;
       letter-spacing: 0.1em;
