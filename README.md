@@ -1,59 +1,107 @@
-# SmartStadium
+# Smart Stadium Navigator 🏟️
 
-This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 21.2.7.
+[![Angular Version](https://img.shields.io/badge/Angular-21.2.7-dd0031?style=for-the-badge&logo=angular)](https://angular.dev/)
+[![Firebase](https://img.shields.io/badge/Firebase-Realtime-ffca28?style=for-the-badge&logo=firebase)](https://firebase.google.com/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
 
-## Development server
+**Smart Stadium Navigator** is a cutting-edge real-time crowd management and navigation system designed for modern sporting venues. It provides users with live density maps, wait times for amenities, and smart navigation, while empowering administrators with a powerful control panel to manage stadium operations.
 
-To start a local development server, run:
+---
 
-```bash
-ng serve
-```
+## 🚀 Live Demo
 
-Once the server is running, open your browser and navigate to `http://localhost:4200/`. The application will automatically reload whenever you modify any of the source files.
+| Interface | URL |
+| :--- | :--- |
+| **Public User Portal** | [https://smart-stadium-ec5ba.web.app/](https://smart-stadium-ec5ba.web.app/) |
+| **Admin Control Panel** | [https://smart-stadium-ec5ba.web.app/admin/login](https://smart-stadium-ec5ba.web.app/admin/login) |
 
-## Code scaffolding
+---
 
-Angular CLI includes powerful code scaffolding tools. To generate a new component, run:
+## ✨ Key Features
 
-```bash
-ng generate component component-name
-```
+-   **🛰️ Real-time Synchronization:** Instant updates across all devices via Firebase Firestore.
+-   **🗺️ Dual Map Views:** Seamlessly switch between a custom Schematic view and a high-resolution Satellite Earth view.
+-   **📊 Crowd Density Mapping:** Dynamic visualization of crowd levels across different stadium zones.
+-   **🚶 Smart Navigation:** Intelligent routing to seats, restrooms, and food stalls based on real-time data.
+-   **📢 Admin Broadcast System:** Send instant notifications and alerts to all stadium visitors.
+-   **🛠️ Full Venue Management:** Add, edit, and manage stadium zones, spots, and amenities on the fly.
 
-For a complete list of available schematics (such as `components`, `directives`, or `pipes`), run:
+---
 
-```bash
-ng generate --help
-```
+## 🛠️ Tech Stack
 
-## Building
+-   **Frontend:** [Angular 21.2.7](https://angular.dev/)
+-   **Backend:** [Firebase](https://firebase.google.com/) (Firestore, Hosting)
+-   **Styling:** Vanilla CSS & Tailwind CSS 4.0
+-   **State Management:** RxJS BehaviorSubjects with Firebase sync
+-   **Maps:** Custom SVG Renderer & Leaflet.js
+-   **Testing:** Vitest & Playwright
 
-To build the project run:
+---
 
-```bash
-ng build
-```
+## ⚙️ Getting Started
 
-This will compile your project and store the build artifacts in the `dist/` directory. By default, the production build optimizes your application for performance and speed.
+### Prerequisites
 
-## Running unit tests
+-   **Node.js:** v20.x or higher
+-   **npm:** v10.x or higher
+-   **Angular CLI:** 21.2.7
 
-To execute unit tests with the [Vitest](https://vitest.dev/) test runner, use the following command:
+### Installation
 
-```bash
-ng test
-```
+1.  **Clone the repository:**
+    ```bash
+    git clone https://github.com/your-username/smart-stadium.git
+    cd smart-stadium
+    ```
 
-## Running end-to-end tests
+2.  **Install dependencies:**
+    ```bash
+    npm install
+    ```
 
-For end-to-end (e2e) testing, run:
+### Running Locally
 
-```bash
-ng e2e
-```
+1.  **Start the development server:**
+    ```bash
+    ng serve
+    ```
 
-Angular CLI does not come with an end-to-end testing framework by default. You can choose one that suits your needs.
+2.  **Navigate to:** `http://localhost:4200/`
 
-## Additional Resources
+---
 
-For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.
+## 🔐 Demo Credentials
+
+To test the **Admin Control Panel**, please use the live URL. 
+
+> [!IMPORTANT]
+> **Admin Access:** If you are interested in a deep-dive demo or need Admin login credentials for testing, please connect with me directly.
+
+**Contact:** [pankajkiteln@gmail.com](mailto:pankajkiteln@gmail.com)
+
+---
+
+## 📂 Documentation
+
+Detailed documentation for specific modules can be found in the `document/` directory:
+-   [System Architecture](./document/SYSTEM_ARCHITECTURE.md)
+-   [Admin Panel Guide](./document/ADMIN_PANEL.md)
+-   [Real-time Sync Logic](./document/REALTIME_SYNC.md)
+-   [Smart Navigation](./document/SMART_NAVIGATION.md)
+
+---
+
+## 🤝 Contributing
+
+Contributions are what make the open source community such an amazing place to learn, inspire, and create. Any contributions you make are **greatly appreciated**.
+
+1. Fork the Project
+2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the Branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+---
+
+Developed with ❤️ for the future of Smart Venues.
