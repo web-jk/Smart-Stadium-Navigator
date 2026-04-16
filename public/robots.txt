@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://smart-stadium-ec5ba.web.app/sitemap.xml

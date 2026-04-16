@@ -25,185 +25,165 @@ import { Zone, ZoneType, getDensityColor, getDensityLevel } from '../../models/v
          (touchend)="onTouchEnd()"
          (mousemove)="onMouseMove($event)"
          (mouseup)="onMouseUp()"
-         (mouseleave)="onMouseUp()">
+         (mouseleave)="onMouseUp()"
+         role="application"
+         aria-label="Interactive Stadium Map">
 
       <svg [attr.viewBox]="'0 0 400 400'"
            class="stadium-svg"
            [style.transform]="'scale(' + scale() + ') translate(' + panX() + 'px, ' + panY() + 'px)'"
            (click)="onSvgClick($event)"
-           xmlns="http://www.w3.org/2000/svg">
+           xmlns="http://www.w3.org/2000/svg"
+           aria-hidden="false">
+        <title>Stadium Layout Map</title>
+        <desc>Schematic layout of the stadium showing different zones and their real-time crowd density.</desc>
 
-        <!-- Background -->
-        <defs>
-          <radialGradient id="field-gradient" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stop-color="#166534" stop-opacity="0.5"/>
-            <stop offset="100%" stop-color="#14532d" stop-opacity="0.3"/>
-          </radialGradient>
+        <!-- Background items (decorative) -->
+        <g aria-hidden="true" class="decorative-layers">
+          <defs>
+            <radialGradient id="field-gradient" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="#166534" stop-opacity="0.5"/>
+              <stop offset="100%" stop-color="#14532d" stop-opacity="0.3"/>
+            </radialGradient>
 
-          <!-- Glow filter for active zones -->
-          <filter id="glow">
-            <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
-            <feMerge>
-              <feMergeNode in="coloredBlur"/>
-              <feMergeNode in="SourceGraphic"/>
-            </feMerge>
-          </filter>
-        </defs>
+            <filter id="glow">
+              <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+              <feMerge>
+                <feMergeNode in="coloredBlur"/>
+                <feMergeNode in="SourceGraphic"/>
+              </feMerge>
+            </filter>
+          </defs>
 
-        @if (simulator.venue().isInitialized) {
-          <!-- Stadium Outer Shell (circular) -->
-          <circle cx="200" cy="200" r="180"
-                   fill="none"
-                   stroke="rgba(255,255,255,0.08)"
-                   stroke-width="2"/>
-
-          <!-- Outer concourse ring -->
-          <circle cx="200" cy="200" r="165"
-                   fill="rgba(255,255,255,0.02)"
-                   stroke="rgba(255,255,255,0.06)"
-                   stroke-width="1"/>
-
-          <!-- Seating bowl -->
-          <circle cx="200" cy="200" r="130"
-                   fill="rgba(255,255,255,0.01)"
-                   stroke="rgba(255,255,255,0.04)"
-                   stroke-width="1"/>
-          
-          <!-- Cricket Boundary / Infield -->
-          <circle cx="200" cy="200" r="105"
-                   fill="rgba(255,255,255,0.02)"
-                   stroke="rgba(255, 255, 255, 0.1)"
-                   stroke-width="2"
-                   stroke-dasharray="4,4"/>
-
-          <!-- Playing Field (Circular) -->
-          <circle cx="200" cy="200" r="85"
-                fill="url(#field-gradient)"
-                stroke="rgba(255,255,255,0.15)"
-                stroke-width="1"/>
-                
-          <!-- Cricket Pitch -->
-          <rect x="194" y="175" width="12" height="50" rx="2"
-                fill="#d4b886"
-                stroke="rgba(255,255,255,0.12)" stroke-width="0.5"/>
-                
-          <!-- Inner circle (30 yard circle) -->
-          <circle cx="200" cy="200" r="45"
-                  fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="0.5" stroke-dasharray="2,2"/>
-        }
-
-        <!-- Connection paths (corridors) -->
-        @for (conn of connections(); track conn.from + conn.to) {
-          <line [attr.x1]="getZonePos(conn.from).x"
-                [attr.y1]="getZonePos(conn.from).y"
-                [attr.x2]="getZonePos(conn.to).x"
-                [attr.y2]="getZonePos(conn.to).y"
-                stroke="rgba(255,255,255,0.04)"
-                stroke-width="1"
-                stroke-dasharray="3,3"/>
-        }
-
-        <!-- Route overlay -->
-        @if (activeRoute().length > 1) {
-          @for (i of routeSegments(); track i) {
-            <line [attr.x1]="getZonePos(activeRoute()[i]).x"
-                  [attr.y1]="getZonePos(activeRoute()[i]).y"
-                  [attr.x2]="getZonePos(activeRoute()[i + 1]).x"
-                  [attr.y2]="getZonePos(activeRoute()[i + 1]).y"
-                  stroke="#6366f1"
-                  stroke-width="3"
-                  stroke-linecap="round"
-                  stroke-dasharray="6,4"
-                  class="route-line"/>
+          @if (simulator.venue().isInitialized) {
+            <circle cx="200" cy="200" r="180" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="2"/>
+            <circle cx="200" cy="200" r="165" fill="rgba(255,255,255,0.02)" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+            <circle cx="200" cy="200" r="130" fill="rgba(255,255,255,0.01)" stroke="rgba(255,255,255,0.04)" stroke-width="1"/>
+            <circle cx="200" cy="200" r="105" fill="rgba(255,255,255,0.02)" stroke="rgba(255, 255, 255, 0.1)" stroke-width="2" stroke-dasharray="4,4"/>
+            <circle cx="200" cy="200" r="85" fill="url(#field-gradient)" stroke="rgba(255,255,255,0.15)" stroke-width="1"/>
+            <rect x="194" y="175" width="12" height="50" rx="2" fill="#d4b886" stroke="rgba(255,255,255,0.12)" stroke-width="0.5"/>
+            <circle cx="200" cy="200" r="45" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="0.5" stroke-dasharray="2,2"/>
           }
-        }
+
+          <!-- Connection paths -->
+          @for (conn of connections(); track conn.from + conn.to) {
+            <line [attr.x1]="getZonePos(conn.from).x"
+                  [attr.y1]="getZonePos(conn.from).y"
+                  [attr.x2]="getZonePos(conn.to).x"
+                  [attr.y2]="getZonePos(conn.to).y"
+                  stroke="rgba(255,255,255,0.04)"
+                  stroke-width="1"
+                  stroke-dasharray="3,3"/>
+          }
+        </g>
+
+        <!-- Route overlay (important context) -->
+        <g class="navigation-layer" aria-label="Navigation path">
+          @if (activeRoute().length > 1) {
+            @for (i of routeSegments(); track i) {
+              <line [attr.x1]="getZonePos(activeRoute()[i]).x"
+                    [attr.y1]="getZonePos(activeRoute()[i]).y"
+                    [attr.x2]="getZonePos(activeRoute()[i + 1]).x"
+                    [attr.y2]="getZonePos(activeRoute()[i + 1]).y"
+                    stroke="#6366f1"
+                    stroke-width="3"
+                    stroke-linecap="round"
+                    stroke-dasharray="6,4"
+                    class="route-line"/>
+            }
+          }
+        </g>
 
         <!-- Zone markers -->
-        @for (zone of zones(); track zone.id) {
-          <g class="zone-group"
-             [class.selected]="selectedZoneId() === zone.id"
-             [class.draggable]="isAdminMode()"
-             (mousedown)="onZoneMouseDown(zone, $event)"
-             (click)="onZoneClick(zone, $event)">
+        <g class="zones-layer" aria-label="Stadium Zones">
+          @for (zone of zones(); track zone.id) {
+            <g class="zone-group"
+               role="button"
+               [attr.tabindex]="0"
+               [attr.aria-label]="zone.name + ', status ' + getDensityLevel(zone.crowdDensity) + (zone.waitTimeMinutes > 0 ? ', wait time ' + zone.waitTimeMinutes + ' minutes' : '')"
+               [class.selected]="selectedZoneId() === zone.id"
+               [class.draggable]="isAdminMode()"
+               (mousedown)="onZoneMouseDown(zone, $event)"
+               (click)="onZoneClick(zone, $event)"
+               (keyup.enter)="onZoneClick(zone, $event)"
+               (keyup.space)="onZoneClick(zone, $event)">
 
-            <!-- Density circle (background glow) -->
-            <circle [attr.cx]="zone.position.x"
-                    [attr.cy]="zone.position.y"
-                    [attr.r]="getZoneRadius(zone)"
-                    [attr.fill]="getDensityFill(zone)"
-                    [attr.stroke]="getDensityStroke(zone)"
-                    stroke-width="1.5"
-                    class="zone-circle"
-                    [class.pulse]="zone.trend === 'rising' && getDensityLevel(zone.crowdDensity) === 'high'"
-                    />
-
-            <!-- Highlight ring (pulses when quick action matches this zone type) -->
-            @if (isHighlighted(zone)) {
-              <circle [attr.cx]="zone.position.x"
-                      [attr.cy]="zone.position.y"
-                      [attr.r]="getZoneRadius(zone) + 4"
-                      fill="none"
-                      [attr.stroke]="getDensityColor(zone.crowdDensity)"
-                      stroke-width="3"
-                      class="highlight-ring"
-                      />
+              <!-- Density circle -->
               <circle [attr.cx]="zone.position.x"
                       [attr.cy]="zone.position.y"
                       [attr.r]="getZoneRadius(zone)"
-                      fill="none"
-                      [attr.stroke]="getDensityColor(zone.crowdDensity)"
-                      stroke-width="2"
-                      class="highlight-ping"
+                      [attr.fill]="getDensityFill(zone)"
+                      [attr.stroke]="getDensityStroke(zone)"
+                      stroke-width="1.5"
+                      class="zone-circle"
+                      [class.pulse]="zone.trend === 'rising' && getDensityLevel(zone.crowdDensity) === 'high'"
                       />
-            }
 
-            <!-- Zone icon -->
+              <!-- Highlight ring -->
+              @if (isHighlighted(zone)) {
+                <circle [attr.cx]="zone.position.x"
+                        [attr.cy]="zone.position.y"
+                        [attr.r]="getZoneRadius(zone) + 4"
+                        fill="none"
+                        [attr.stroke]="getDensityColor(zone.crowdDensity)"
+                        stroke-width="3"
+                        class="highlight-ring"
+                        aria-hidden="true"
+                        />
+              }
+
+              <!-- Zone icon -->
+              <text [attr.x]="zone.position.x"
+                    [attr.y]="zone.position.y + 1"
+                    text-anchor="middle"
+                    dominant-baseline="central"
+                    [attr.font-size]="getIconSize(zone)"
+                    class="zone-icon"
+                    aria-hidden="true">
+                {{ getZoneIcon(zone) }}
+              </text>
+
+              <!-- Wait time badge -->
+              @if (zone.waitTimeMinutes > 0) {
+                <g class="wait-badge-group" aria-hidden="true">
+                  <rect [attr.x]="zone.position.x + getZoneRadius(zone) - 4"
+                        [attr.y]="zone.position.y - getZoneRadius(zone) - 4"
+                        width="24" height="16" rx="8"
+                        [attr.fill]="getDensityColor(zone.crowdDensity)"
+                        class="wait-badge"/>
+                  <text [attr.x]="zone.position.x + getZoneRadius(zone) + 8"
+                        [attr.y]="zone.position.y - getZoneRadius(zone) + 5"
+                        text-anchor="middle"
+                        dominant-baseline="central"
+                        font-size="8"
+                        font-weight="700"
+                        fill="white"
+                        class="wait-text">
+                    {{ zone.waitTimeMinutes }}m
+                  </text>
+                </g>
+              }
+            </g>
+          }
+        </g>
+
+        <!-- Zone labels -->
+        <g class="labels-layer" aria-hidden="true">
+          @for (zone of zones(); track zone.id) {
             <text [attr.x]="zone.position.x"
-                  [attr.y]="zone.position.y + 1"
+                  [attr.y]="zone.position.y + getZoneRadius(zone) + 12"
                   text-anchor="middle"
-                  dominant-baseline="central"
-                  [attr.font-size]="getIconSize(zone)"
-                  class="zone-icon">
-              {{ getZoneIcon(zone) }}
+                  font-size="7"
+                  font-weight="500"
+                  fill="rgba(255,255,255,0.5)"
+                  class="zone-label">
+              {{ zone.name }}
             </text>
-
-            <!-- Wait time badge (only for amenity zones) -->
-            @if (zone.waitTimeMinutes > 0) {
-              <g>
-                <rect [attr.x]="zone.position.x + getZoneRadius(zone) - 4"
-                      [attr.y]="zone.position.y - getZoneRadius(zone) - 4"
-                      width="24" height="16" rx="8"
-                      [attr.fill]="getDensityColor(zone.crowdDensity)"
-                      class="wait-badge"/>
-                <text [attr.x]="zone.position.x + getZoneRadius(zone) + 8"
-                      [attr.y]="zone.position.y - getZoneRadius(zone) + 5"
-                      text-anchor="middle"
-                      dominant-baseline="central"
-                      font-size="8"
-                      font-weight="700"
-                      fill="white"
-                      class="wait-text">
-                  {{ zone.waitTimeMinutes }}m
-                </text>
-              </g>
-            }
-          </g>
-        }
-
-        <!-- Zone labels (separate layer) -->
-        @for (zone of zones(); track zone.id) {
-          <text [attr.x]="zone.position.x"
-                [attr.y]="zone.position.y + getZoneRadius(zone) + 12"
-                text-anchor="middle"
-                font-size="7"
-                font-weight="500"
-                fill="rgba(255,255,255,0.5)"
-                class="zone-label">
-            {{ zone.name }}
-          </text>
-        }
+          }
+        </g>
       </svg>
     </div>
+
   `,
   styles: [`
     .map-container {
@@ -418,7 +398,7 @@ export class StadiumMapComponent implements AfterViewInit {
     this.onMouseUp();
   }
 
-  onZoneClick(zone: Zone, event: MouseEvent): void {
+  onZoneClick(zone: Zone, event: Event): void {
     if (this.draggedZoneId()) return;
     event.stopPropagation();
     this.zoneClicked.emit(zone);

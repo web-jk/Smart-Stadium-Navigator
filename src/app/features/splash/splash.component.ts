@@ -10,11 +10,11 @@ import { Component, output } from '@angular/core';
       <div class="orb orb-2"></div>
       <div class="orb orb-3"></div>
 
-      <div class="splash-content animate-scale-in">
+      <main class="splash-content animate-fade-in" role="main">
         <!-- Logo Icon -->
         <div class="logo-wrapper">
-          <div class="logo-icon">
-            <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+          <div class="logo-icon" role="img" aria-label="StadiumFlow Logo">
+            <svg width="48" height="48" viewBox="0 0 48 48" fill="none" aria-hidden="true">
               <path d="M24 4C12.954 4 4 12.954 4 24s8.954 20 20 20 20-8.954 20-20S35.046 4 24 4z"
                     stroke="url(#splash-grad)" stroke-width="2.5" fill="none"/>
               <ellipse cx="24" cy="24" rx="14" ry="8"
@@ -34,7 +34,7 @@ import { Component, output } from '@angular/core';
             </svg>
           </div>
           <div class="live-badge animate-pulse-soft">
-            <span class="live-dot"></span>
+            <span class="live-dot" aria-hidden="true"></span>
             LIVE
           </div>
         </div>
@@ -46,7 +46,7 @@ import { Component, output } from '@angular/core';
 
         <!-- Venue Name -->
         <div class="venue-name animate-fade-in">
-          <span class="venue-icon">🏟️</span>
+          <span class="venue-icon" role="img" aria-label="Stadium Icon">🏟️</span>
           MCA Stadium, Pune
         </div>
 
@@ -54,15 +54,15 @@ import { Component, output } from '@angular/core';
         <p class="event-name">IPL Finals 2026</p>
 
         <!-- CTA Button -->
-        <button class="cta-button" (click)="enter.emit()">
+        <button class="cta-button" (click)="enter.emit()" aria-label="Explore Stadium and start navigation">
           <span class="btn-text">Explore Stadium</span>
-          <span class="btn-icon">→</span>
+          <span class="btn-icon" aria-hidden="true">→</span>
           <div class="btn-shimmer"></div>
         </button>
 
         <!-- Tag line -->
         <p class="tagline">Real-time crowd navigation • No app required</p>
-      </div>
+      </main>
     </div>
   `,
   styles: [`
@@ -149,11 +149,12 @@ import { Component, output } from '@angular/core';
 
     .pulse-dot {
       animation: live-pulse 2s ease-in-out infinite;
+      transform-origin: center;
     }
 
     @keyframes live-pulse {
-      0%, 100% { opacity: 1; r: 3; }
-      50% { opacity: 0.5; r: 5; }
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(1.6); }
     }
 
     .live-badge {
@@ -274,6 +275,14 @@ import { Component, output } from '@angular/core';
       font-size: 0.8rem;
       color: var(--color-text-muted);
       letter-spacing: 0.02em;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .orb, .animate-scale-in, .animate-pulse-soft, .animate-fade-in, .pulse-dot, .live-dot, .btn-shimmer {
+        animation: none !important;
+        transition: none !important;
+      }
+      .orb { opacity: 0.1; }
     }
   `]
 })

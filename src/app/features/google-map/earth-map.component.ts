@@ -24,29 +24,43 @@ declare const L: any;
   imports: [CommonModule],
   template: `
     <div class="earth-map-wrapper">
-      <div class="map-mount" #mapMount></div>
+      <div class="map-mount" #mapMount role="application" aria-label="Satellite Map of Stadium"></div>
 
-      <div class="map-controls">
+      <nav class="map-controls" aria-label="Map controls">
         <div class="tile-toggle glass-strong">
-          <button class="tile-btn" [class.active]="tileMode() === 'satellite'" (click)="setTileMode('satellite')">🛰️ Satellite</button>
-          <button class="tile-btn" [class.active]="tileMode() === 'street'" (click)="setTileMode('street')">🗺️ Street</button>
+          <button class="tile-btn" 
+                  [class.active]="tileMode() === 'satellite'" 
+                  [ariaPressed]="tileMode() === 'satellite'"
+                  (click)="setTileMode('satellite')"
+                  aria-label="Satellite view">
+            <span aria-hidden="true">🛰️</span> Satellite
+          </button>
+          <button class="tile-btn" 
+                  [class.active]="tileMode() === 'street'" 
+                  [ariaPressed]="tileMode() === 'street'"
+                  (click)="setTileMode('street')"
+                  aria-label="Street view">
+            <span aria-hidden="true">🗺️</span> Street
+          </button>
         </div>
-        <button class="recenter-btn glass-strong" (click)="recenterMap()" title="Re-center on stadium">🏟️</button>
-      </div>
+        <button class="recenter-btn glass-strong" (click)="recenterMap()" title="Re-center on stadium" aria-label="Re-center map on stadium">
+          <span aria-hidden="true">🏟️</span>
+        </button>
+      </nav>
 
-      <div class="location-bar glass-strong">
+      <div class="location-bar glass-strong" role="status">
         @if (locationService.isTracking() && locationService.currentPosition()) {
-          <div class="location-status active">
-            <span class="loc-dot pulse-dot"></span>
+          <div class="location-status active" aria-live="polite">
+            <span class="loc-dot pulse-dot" aria-hidden="true"></span>
             <span class="loc-text">📍 {{ locationService.distanceLabel() }}</span>
             <span class="loc-accuracy">±{{ locationService.currentPosition()?.accuracy?.toFixed(0) }}m</span>
           </div>
         } @else if (locationService.locationError()) {
-          <div class="location-status error">
+          <div class="location-status error" aria-live="polite">
             <span class="loc-text">🔴 {{ locationService.locationError() }}</span>
           </div>
         } @else {
-          <div class="location-status pending">
+          <div class="location-status pending" aria-live="polite">
             <span class="loc-text">📡 Acquiring location...</span>
           </div>
         }
@@ -55,18 +69,19 @@ declare const L: any;
       @if (isAdminMode()) {
         <div class="search-overlay animate-fade-in">
           <div class="search-box glass-strong">
-            <input type="text" #searchInput placeholder="Search stadium or enter lat, lng..." 
+            <label for="stadium-search" class="sr-only">Search stadium or coordinates</label>
+            <input type="text" id="stadium-search" #searchInput placeholder="Search stadium or enter lat, lng..." 
                    (keyup.enter)="searchLocation(searchInput.value)" />
-            <button class="search-go" (click)="searchLocation(searchInput.value)" [disabled]="isSearching()">
+            <button class="search-go" (click)="searchLocation(searchInput.value)" [disabled]="isSearching()" aria-label="Search">
               @if (isSearching()) {
-                <span class="search-spinner"></span>
+                <span class="search-spinner" aria-hidden="true"></span>
               } @else {
-                🔍
+                <span aria-hidden="true">🔍</span>
               }
             </button>
           </div>
           @if (searchError()) {
-            <div class="search-error animate-slide-up">{{ searchError() }}</div>
+            <div class="search-error animate-slide-up" role="alert">{{ searchError() }}</div>
           }
           @if (!simulator.venue().isInitialized && !searchError()) {
             <div class="init-prompt animate-pulse">Click place on map to set stadium center</div>
@@ -74,13 +89,14 @@ declare const L: any;
         </div>
       }
 
-      <div class="zone-legend glass-strong">
-        <div class="legend-item"><span class="legend-dot" style="background: #22c55e"></span><span>Low</span></div>
-        <div class="legend-item"><span class="legend-dot" style="background: #f59e0b"></span><span>Moderate</span></div>
-        <div class="legend-item"><span class="legend-dot" style="background: #ef4444"></span><span>Busy</span></div>
-        <div class="legend-item"><span class="legend-dot" style="background: #dc2626"></span><span>Very Busy</span></div>
-      </div>
+      <aside class="zone-legend glass-strong" aria-label="Density Legend">
+        <div class="legend-item"><span class="legend-dot" style="background: #22c55e" aria-hidden="true"></span><span>Low</span></div>
+        <div class="legend-item"><span class="legend-dot" style="background: #f59e0b" aria-hidden="true"></span><span>Moderate</span></div>
+        <div class="legend-item"><span class="legend-dot" style="background: #ef4444" aria-hidden="true"></span><span>Busy</span></div>
+        <div class="legend-item"><span class="legend-dot" style="background: #dc2626" aria-hidden="true"></span><span>Very Busy</span></div>
+      </aside>
     </div>
+
   `,
   styles: [`
     :host { display: block; width: 100%; height: 100%; position: relative; }

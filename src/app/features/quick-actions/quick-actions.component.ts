@@ -6,21 +6,21 @@ export type QuickActionType = 'food' | 'restroom' | 'exit' | 'merch';
   selector: 'app-quick-actions',
   standalone: true,
   template: `
-    <div class="quick-actions">
-      <button class="action-btn food" (click)="actionClicked.emit('food')">
-        <span class="action-icon">🍔</span>
+    <div class="quick-actions" role="group" aria-label="Find amenities">
+      <button class="action-btn food" (click)="actionClicked.emit('food')" aria-label="Find nearest food and concessions">
+        <span class="action-icon" aria-hidden="true">🍔</span>
         <span class="action-label">Food</span>
       </button>
-      <button class="action-btn restroom" (click)="actionClicked.emit('restroom')">
-        <span class="action-icon">🚻</span>
+      <button class="action-btn restroom" (click)="actionClicked.emit('restroom')" aria-label="Find nearest restrooms">
+        <span class="action-icon" aria-hidden="true">🚻</span>
         <span class="action-label">Restroom</span>
       </button>
-      <button class="action-btn exit" (click)="actionClicked.emit('exit')">
-        <span class="action-icon">🚪</span>
+      <button class="action-btn exit" (click)="actionClicked.emit('exit')" aria-label="Find nearest stadium exits">
+        <span class="action-icon" aria-hidden="true">🚪</span>
         <span class="action-label">Exit</span>
       </button>
-      <button class="action-btn merch" (click)="actionClicked.emit('merch')">
-        <span class="action-icon">👕</span>
+      <button class="action-btn merch" (click)="actionClicked.emit('merch')" aria-label="Find nearest merchandise shops">
+        <span class="action-icon" aria-hidden="true">👕</span>
         <span class="action-label">Shop</span>
       </button>
     </div>

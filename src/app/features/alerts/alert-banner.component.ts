@@ -7,16 +7,20 @@ import { AlertService } from '../../services/alert.service';
   standalone: true,
   imports: [CommonModule],
   template: `
-    <div class="alerts-container">
+    <div class="alerts-container" role="region" aria-label="Notifications">
       @for (alert of alertService.alerts(); track alert.id) {
         <div class="alert-toast animate-slide-down"
+             role="alert"
+             aria-live="polite"
              [class.alert-info]="alert.severity === 'info'"
              [class.alert-warning]="alert.severity === 'warning'"
              [class.alert-success]="alert.severity === 'success'"
              (click)="alertService.dismiss(alert.id)">
-          <span class="alert-icon">{{ alert.icon }}</span>
+          <span class="alert-icon" aria-hidden="true">{{ alert.icon }}</span>
           <span class="alert-message">{{ alert.message }}</span>
-          <button class="alert-dismiss">✕</button>
+          <button class="alert-dismiss" 
+                  (click)="$event.stopPropagation(); alertService.dismiss(alert.id)"
+                  aria-label="Dismiss notification">✕</button>
         </div>
       }
     </div>

@@ -33,9 +33,9 @@ import { StatsComponent } from '../stats/stats.component';
   template: `
     <div class="app-shell">
       <!-- Top Bar -->
-      <header class="top-bar glass-strong">
+      <header class="top-bar glass-strong" role="banner">
         <div class="top-bar-left">
-          <span class="app-logo-sm">🏟️</span>
+          <span class="app-logo-sm" role="img" aria-label="Stadium Icon">🏟️</span>
           <div>
             <h1 class="app-title-sm">Stadium<span class="hl">Flow</span></h1>
             <span class="event-badge">{{ eventPhaseLabel() }}</span>
@@ -43,31 +43,36 @@ import { StatsComponent } from '../stats/stats.component';
         </div>
         <div class="top-bar-right">
           <!-- Map View Toggle -->
-          <div class="map-toggle">
+          <nav class="map-toggle" aria-label="Map view selection">
             <button class="toggle-btn"
                     [class.active]="mapView() === 'stadium'"
+                    [ariaPressed]="mapView() === 'stadium'"
                     (click)="setMapView('stadium')"
+                    aria-label="Switch to Schematic Stadium Map"
                     title="Stadium Map">
               🗺️
             </button>
             <button class="toggle-btn"
                     [class.active]="mapView() === 'earth'"
+                    [ariaPressed]="mapView() === 'earth'"
                     (click)="setMapView('earth')"
+                    aria-label="Switch to Satellite Earth View"
                     title="Earth View">
               🛰️
             </button>
-          </div>
+          </nav>
           <!-- Distance indicator -->
           @if (locationService.distanceLabel()) {
-            <span class="distance-badge animate-fade-in">
+            <span class="distance-badge animate-fade-in" aria-live="polite">
+              <span class="sr-only">Distance: </span>
               📍 {{ locationService.distanceLabel() }}
             </span>
           }
-          <button class="stats-btn" (click)="toggleStats()" title="My Stats">
+          <button class="stats-btn" (click)="toggleStats()" title="My Stats" aria-label="Open my statistics">
             📊
           </button>
-          <div class="live-indicator animate-live-pulse">
-            <span class="live-dot-sm"></span>
+          <div class="live-indicator animate-live-pulse" role="status">
+            <span class="live-dot-sm" aria-hidden="true"></span>
             LIVE
           </div>
         </div>
@@ -76,8 +81,8 @@ import { StatsComponent } from '../stats/stats.component';
       <!-- Alert Banner -->
       <app-alert-banner />
 
-      <!-- Map Area (takes full height) -->
-      <main class="map-area">
+      <!-- Map Area -->
+      <main class="map-area" role="main">
         @if (mapView() === 'stadium') {
           <app-stadium-map
             [activeRoute]="activeRoutePath()"
@@ -93,9 +98,9 @@ import { StatsComponent } from '../stats/stats.component';
       </main>
 
       <!-- Quick Actions Bar -->
-      <div class="bottom-bar glass-strong">
+      <nav class="bottom-bar glass-strong" aria-label="Quick Actions">
         <app-quick-actions (actionClicked)="onQuickAction($event)" />
-      </div>
+      </nav>
 
       <!-- Zone Detail Sheet -->
       @if (selectedZone()) {
@@ -128,9 +133,9 @@ import { StatsComponent } from '../stats/stats.component';
 
       <!-- Reroute Alert Banner -->
       @if (showRerouteAlert()) {
-        <div class="reroute-overlay animate-slide-down">
+        <div class="reroute-overlay animate-slide-down" role="alert" aria-live="assertive">
           <div class="reroute-card glass-strong">
-            <span class="reroute-icon">🔄</span>
+            <span class="reroute-icon" aria-hidden="true">🔄</span>
             <div class="reroute-text">
               <span class="reroute-title">Route Updated!</span>
               <span class="reroute-desc">A zone on your path got busy. We found a faster route.</span>
@@ -140,6 +145,7 @@ import { StatsComponent } from '../stats/stats.component';
         </div>
       }
     </div>
+
   `,
   styles: [`
     .app-shell {
